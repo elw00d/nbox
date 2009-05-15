@@ -1,0 +1,227 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema"
+		   targetNamespace="http://www.elwood.su/projects/nbox/schemas/config-file/v1.0"
+		   xmlns:own="http://www.elwood.su/projects/nbox/schemas/config-file/v1.0">
+
+  <xs:simpleType name="include-method-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="File"/>
+      <xs:enumeration value="Resource"/>
+      <xs:enumeration value="Overlay"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="configuration">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="compression-options-set" minOccurs="1" maxOccurs="1">
+          <xs:complexType>
+            <xs:sequence minOccurs="1" maxOccurs="unbounded">
+              <xs:element name="compression-option">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="level" minOccurs="1" maxOccurs="1">
+                      <xs:complexType>
+                        <xs:attribute name="value" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="id" type="xs:string" use="required" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+
+          <xs:unique name="compression-option-uniqueness">
+            <xs:selector xpath="own:compression-option"/>
+            <xs:field xpath="@id"/>
+          </xs:unique>
+
+        </xs:element>
+
+        <xs:element name="assemblies" minOccurs="1" maxOccurs="1">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element minOccurs="0" maxOccurs="unbounded" name="assembly">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="aliases" minOccurs="0" maxOccurs="1">
+                      <xs:complexType>
+                        <xs:sequence minOccurs="0" maxOccurs="unbounded">
+                          <xs:element name="alias">
+                            <xs:complexType>
+                              <xs:attribute name="value" type="xs:string" use="required" />
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                        <xs:attribute name="generate-partially-aliases" use="optional"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <!-- Required main options -->
+                  <xs:attribute name="id" type="xs:string" use="required" />
+                  <xs:attribute name="path" type="xs:string" use="required" />
+                  <xs:attribute name="compression-ref" type="xs:string" use="required" />
+                  <xs:attribute name="copy-compressed-to" type="xs:string" use="optional" />
+                  <!-- Include method and its properties -->
+                  <xs:attribute name="include-method" use="required" type="own:include-method-type"/>
+                  <xs:attribute name="file-load-from-path" type="xs:string" use="optional"/>
+                  <xs:attribute name="overlay-offset" type="xs:string" use="optional" />
+                  <xs:attribute name="overlay-length" type="xs:string" use="optional" />
+                  <xs:attribute name="resource-name" type="xs:string" use="optional" />
+                  <!-- Specially for assembly -->
+                  <xs:attribute name="lazy-load" type="xs:boolean" use="optional" />
+                </xs:complexType>
+
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+
+          <xs:keyref name="assembly-compression-option-ref" refer="own:compression-option-id" >
+            <xs:selector xpath="own:assembly"/>
+            <xs:field xpath="@compression-ref"/>
+          </xs:keyref>
+
+          <xs:unique name="assembly-id-uniqueness">
+            <xs:selector xpath="own:assembly"/>
+            <xs:field xpath="@id"/>
+          </xs:unique>
+
+
+        </xs:element>
+
+        <xs:element name="files" minOccurs="1" maxOccurs="1">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element minOccurs="0" maxOccurs="unbounded" name="file">
+                <xs:complexType>
+                  <!-- Required main options -->
+                  <xs:attribute name="id" type="xs:string" use="required" />
+                  <xs:attribute name="path" type="xs:string" use="required" />
+                  <xs:attribute name="compression-ref" type="xs:string" use="required" />
+                  <xs:attribute name="copy-compressed-to" type="xs:string" use="optional" />
+                  <!-- Include method and its properties -->
+                  <xs:attribute name="include-method" use="required" type="own:include-method-type"/>
+                  <xs:attribute name="file-load-from-path" type="xs:string" use="optional"/>
+                  <xs:attribute name="overlay-offset" type="xs:string" use="optional" />
+                  <xs:attribute name="overlay-length" type="xs:string" use="optional" />
+                  <xs:attribute name="resource-name" type="xs:string" use="optional" />
+                  <!-- Specially for file -->
+                  <xs:attribute name="extract-to-path" type="xs:string" use="optional" />
+                  <xs:attribute name="overwrite-on-extracting" type="xs:string" use="optional" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+
+          <xs:keyref name="file-compression-option-ref" refer="own:compression-option-id" >
+            <xs:selector xpath="own:file"/>
+            <xs:field xpath="@compression-ref"/>
+          </xs:keyref>
+
+          <xs:unique name="files-id-uniqueness">
+            <xs:selector xpath="own:file"/>
+            <xs:field xpath="@id"/>
+          </xs:unique>
+
+        </xs:element>
+
+        <xs:element minOccurs="1" maxOccurs="1" name="output">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="includes">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="assembly" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="ref" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="file" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="ref" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <!--<xs:element name="references">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="reference" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="path" type="xs:string" use="required"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>-->
+            </xs:sequence>
+            <xs:attribute name="path" type="xs:string" use="required" />
+            <xs:attribute name="apptype" use="required">
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:enumeration value="Console"/>
+                  <xs:enumeration value="WinExe"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+            <xs:attribute name="machine" use="required">
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:enumeration value="Any"/>
+                  <xs:enumeration value="x86"/>
+                  <xs:enumeration value="x64"/>
+                  <xs:enumeration value="Itanium"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+            <xs:attribute name="apartment" use="required">
+              <xs:simpleType >
+                <xs:restriction base="xs:string">
+                  <xs:enumeration value="STA"/>
+                  <xs:enumeration value="MTA"/>
+                  <xs:enumeration value="Unknown"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+            <xs:attribute name="main-assembly-ref" type="xs:string" use="required" />
+            <xs:attribute name="win32icon" type="xs:string" use="optional" />
+          </xs:complexType>
+
+          <xs:keyref name="main-assembly-ref" refer="own:assembly-id">
+            <xs:selector xpath="own:includes/own:assembly"/>
+            <xs:field xpath="@main-assembly-ref"/>
+          </xs:keyref>
+
+          <xs:keyref name="assembly-ref" refer="own:assembly-id">
+            <xs:selector xpath="own:includes/own:assembly"/>
+            <xs:field xpath="@ref"/>
+          </xs:keyref>
+
+          <xs:keyref name="file-ref" refer="own:file-id">
+            <xs:selector xpath="own:includes/own:file"/>
+            <xs:field xpath="@ref"/>
+          </xs:keyref>
+
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+
+    <xs:key name="compression-option-id">
+      <xs:selector xpath="own:compression-options-set/own:compression-option"/>
+      <xs:field xpath="@id"/>
+    </xs:key>
+
+    <xs:key name="assembly-id">
+      <xs:selector xpath="own:assemblies/own:assembly"/>
+      <xs:field xpath="@id"/>
+    </xs:key>
+
+    <xs:key name="file-id">
+      <xs:selector xpath="own:files/own:file"/>
+      <xs:field xpath="@id"/>
+    </xs:key>
+
+  </xs:element>
+</xs:schema>

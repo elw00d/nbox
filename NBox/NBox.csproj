@@ -1,0 +1,101 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{EAEF993B-E328-45CB-8FDA-533B66F54055}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>NBox</RootNamespace>
+    <AssemblyName>NBox</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;_BUILD_FROM_FILES</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Common.Logging, Version=1.2.0.0, Culture=neutral, PublicKeyToken=af08829b84f0328e">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\3rd-party\common-logging\Common.Logging.dll</HintPath>
+    </Reference>
+    <Reference Include="Common.Logging.NLog, Version=1.2.0.2, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\3rd-party\common-logging\Common.Logging.NLog.dll</HintPath>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib, Version=0.85.5.452, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\3rd-party\sharp-zip\ICSharpCode.SharpZipLib.dll</HintPath>
+    </Reference>
+    <Reference Include="NLog, Version=1.0.0.505, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\3rd-party\common-logging\NLog.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Config\BuildConfiguration.cs" />
+    <Compile Include="Config\BuildConfigurationVariables.cs" />
+    <Compile Include="Config\CompressionConfig.cs" />
+    <Compile Include="Config\IncludedAssemblyConfig.cs" />
+    <Compile Include="Config\IncludedFileConfig.cs" />
+    <Compile Include="Config\IncludedObjectConfigBase.cs" />
+    <Compile Include="Config\IncludeMethod.cs" />
+    <Compile Include="Config\ISerializableToXmlNode.cs" />
+    <Compile Include="Lzma\Common\CommandLineParser.cs" />
+    <Compile Include="Lzma\Common\CRC.cs" />
+    <Compile Include="Lzma\Common\InBuffer.cs" />
+    <Compile Include="Lzma\Common\OutBuffer.cs" />
+    <Compile Include="Lzma\Compress\LZMA\LzmaBase.cs" />
+    <Compile Include="Lzma\Compress\LZMA\LzmaDecoder.cs" />
+    <Compile Include="Lzma\Compress\LZMA\LzmaEncoder.cs" />
+    <Compile Include="Lzma\Compress\LZ\IMatchFinder.cs" />
+    <Compile Include="Lzma\Compress\LZ\LzBinTree.cs" />
+    <Compile Include="Lzma\Compress\LZ\LzInWindow.cs" />
+    <Compile Include="Lzma\Compress\LZ\LzOutWindow.cs" />
+    <Compile Include="Lzma\Compress\RangeCoder\RangeCoder.cs" />
+    <Compile Include="Lzma\Compress\RangeCoder\RangeCoderBit.cs" />
+    <Compile Include="Lzma\Compress\RangeCoder\RangeCoderBitTree.cs" />
+    <Compile Include="Lzma\ICoder.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utils\Annotations.cs" />
+    <Compile Include="Utils\ArgumentChecker.cs" />
+    <Compile Include="Utils\LzmaHelper.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\NBox.Loader\Zip\NBox.Loader.zip">
+      <Link>NBox.Loader.zip</Link>
+    </EmbeddedResource>
+    <None Include="App.config" />
+    <EmbeddedResource Include="config-file.xsd">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
