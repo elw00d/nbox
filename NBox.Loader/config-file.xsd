@@ -108,7 +108,15 @@
                   <xs:attribute name="resource-name" type="xs:string" use="optional" />
                   <!-- Specially for file -->
                   <xs:attribute name="extract-to-path" type="xs:string" use="optional" />
-                  <xs:attribute name="overwrite-on-extracting" type="xs:string" use="optional" />
+                  <xs:attribute name="overwrite-on-extracting" use="optional">
+                    <xs:simpleType>
+                      <xs:restriction base="xs:string">
+                        <xs:enumeration value="Always"/>
+                        <xs:enumeration value="CheckExist"/>
+                        <xs:enumeration value="CheckSize"/>
+                      </xs:restriction>
+                    </xs:simpleType>
+                  </xs:attribute>
                 </xs:complexType>
               </xs:element>
             </xs:sequence>
@@ -132,30 +140,33 @@
               <xs:element name="includes">
                 <xs:complexType>
                   <xs:sequence>
-                    <xs:element name="assembly" minOccurs="0" maxOccurs="unbounded">
+                    <!-- Assemblies -->
+                    <xs:element name="assemblies" minOccurs="0" maxOccurs="1">
                       <xs:complexType>
-                        <xs:attribute name="ref" type="xs:string" use="required" />
+                        <xs:sequence>
+                          <xs:element name="assembly" minOccurs="0" maxOccurs="unbounded">
+                            <xs:complexType>
+                              <xs:attribute name="ref" type="xs:string" use="required" />
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
                       </xs:complexType>
                     </xs:element>
-                    <xs:element name="file" minOccurs="0" maxOccurs="unbounded">
+                    <!-- Files -->
+                    <xs:element name="files" minOccurs="0" maxOccurs="1">
                       <xs:complexType>
-                        <xs:attribute name="ref" type="xs:string" use="required" />
+                        <xs:sequence>
+                          <xs:element name="file" minOccurs="0" maxOccurs="unbounded">
+                            <xs:complexType>
+                              <xs:attribute name="ref" type="xs:string" use="required" />
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
                       </xs:complexType>
                     </xs:element>
                   </xs:sequence>
                 </xs:complexType>
               </xs:element>
-              <!--<xs:element name="references">
-                <xs:complexType>
-                  <xs:sequence>
-                    <xs:element name="reference" minOccurs="0" maxOccurs="unbounded">
-                      <xs:complexType>
-                        <xs:attribute name="path" type="xs:string" use="required"/>
-                      </xs:complexType>
-                    </xs:element>
-                  </xs:sequence>
-                </xs:complexType>
-              </xs:element>-->
             </xs:sequence>
             <xs:attribute name="path" type="xs:string" use="required" />
             <xs:attribute name="apptype" use="required">
@@ -195,12 +206,12 @@
           </xs:keyref>
 
           <xs:keyref name="assembly-ref" refer="own:assembly-id">
-            <xs:selector xpath="own:includes/own:assembly"/>
+            <xs:selector xpath="own:includes/own:assemblies/own:assembly"/>
             <xs:field xpath="@ref"/>
           </xs:keyref>
 
           <xs:keyref name="file-ref" refer="own:file-id">
-            <xs:selector xpath="own:includes/own:file"/>
+            <xs:selector xpath="own:includes/own:files/own:file"/>
             <xs:field xpath="@ref"/>
           </xs:keyref>
 
