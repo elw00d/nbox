@@ -55,18 +55,18 @@ namespace NBox.Config
             return (null);
         }
 
-        private readonly List<IncludedAssemblyConfig> includedAssemblyConfigs = new List<IncludedAssemblyConfig>();
+        private readonly List<IncludedAssemblyConfig> assemblyConfigs = new List<IncludedAssemblyConfig>();
 
-        private void addIncludedAssemblyConfigToList(IncludedAssemblyConfig includedAssemblyConfig) {
-            if (GetIncludedAssemblyConfigByID(includedAssemblyConfig.ID) != null) {
+        private void addAssemblyConfigToList(IncludedAssemblyConfig includedAssemblyConfig) {
+            if (GetAssemblyConfigByID(includedAssemblyConfig.ID) != null) {
                 throw new InvalidOperationException(ERROR_ID_ALREADY_EXISTS);
             }
-            includedAssemblyConfigs.Add(includedAssemblyConfig);
+            this.assemblyConfigs.Add(includedAssemblyConfig);
         }
 
         [CanBeNull]
-        public IncludedAssemblyConfig GetIncludedAssemblyConfigByID(string id) {
-            foreach (IncludedAssemblyConfig includedAssemblyConfig in includedAssemblyConfigs) {
+        public IncludedAssemblyConfig GetAssemblyConfigByID(string id) {
+            foreach (IncludedAssemblyConfig includedAssemblyConfig in this.assemblyConfigs) {
                 if (includedAssemblyConfig.ID == id) {
                     return (includedAssemblyConfig);
                 }
@@ -75,18 +75,18 @@ namespace NBox.Config
             return (null);
         }
 
-        private readonly List<IncludedFileConfig> includedFileConfigs = new List<IncludedFileConfig>();
+        private readonly List<IncludedFileConfig> fileConfigs = new List<IncludedFileConfig>();
 
-        private void addIncludedFileConfigToList(IncludedFileConfig includedFileConfig) {
-            if (GetIncludedFileConfigByID(includedFileConfig.ID) != null) {
+        private void addFileConfigToList(IncludedFileConfig includedFileConfig) {
+            if (GetFileConfigByID(includedFileConfig.ID) != null) {
                 throw new InvalidOperationException(ERROR_ID_ALREADY_EXISTS);
             }
-            includedFileConfigs.Add(includedFileConfig);
+            this.fileConfigs.Add(includedFileConfig);
         }
 
         [CanBeNull]
-        public IncludedFileConfig GetIncludedFileConfigByID(string id) {
-            foreach (IncludedFileConfig includedFileConfig in includedFileConfigs) {
+        public IncludedFileConfig GetFileConfigByID(string id) {
+            foreach (IncludedFileConfig includedFileConfig in this.fileConfigs) {
                 if (includedFileConfig.ID == id) {
                     return (includedFileConfig);
                 }
@@ -150,14 +150,6 @@ namespace NBox.Config
                 return (outputApartmentState);
             }
         }
-
-        //private readonly List<string> references = new List<string>();
-
-        //public IList<string> References {
-        //    get {
-        //        return (references);
-        //    }
-        //}
 
         private readonly string targetNamespace;
 
@@ -249,7 +241,7 @@ namespace NBox.Config
                     aliases.Add(aliasValueAttribute.Value);
                 }
                 //
-                addIncludedAssemblyConfigToList(new IncludedAssemblyConfig(idAttributeValue,
+                addAssemblyConfigToList(new IncludedAssemblyConfig(idAttributeValue,
                     includeMethod, pathAttributeValue, compressionConfigByRef,
                     copyCompressedToAttributeValue, lazyLoadAttributeValue, aliases,
                     generatePartiallyAliasesAttributeValue));
@@ -286,7 +278,7 @@ namespace NBox.Config
                     overwritingOptionsAttributeValue = (OverwritingOptions) Enum.Parse(typeof (OverwritingOptions), overwritingOptionsAttribute.Value, true);
                 }
                 //
-                addIncludedFileConfigToList(new IncludedFileConfig(idAttributeValue,
+                addFileConfigToList(new IncludedFileConfig(idAttributeValue,
                     includeMethod, pathAttributeValue, compressionConfigByRef,
                     copyCompressedToAttributeValue, extractToPathAttributeValue, overwritingOptionsAttributeValue));
             }
@@ -300,7 +292,7 @@ namespace NBox.Config
             this.outputPath = outputNode.Attributes["path"].Value;
             outputAppType = (OutputAppType) Enum.Parse(typeof (OutputAppType), outputNode.Attributes["apptype"].Value, true);
             outputMachine = (OutputMachine) Enum.Parse(typeof (OutputMachine), outputNode.Attributes["machine"].Value, true);
-            mainAssembly = GetIncludedAssemblyConfigByID(outputNode.Attributes["main-assembly-ref"].Value);
+            mainAssembly = GetAssemblyConfigByID(outputNode.Attributes["main-assembly-ref"].Value);
             if (mainAssembly == null) {
                 throw new InvalidOperationException("Main assembly specified with incorrect ID.");
             }
@@ -310,34 +302,27 @@ namespace NBox.Config
                 outputWin32IconPath = outputWin32IconAttribute.Value;
             }
             //
-            XmlNodeList includesAssemblyNodes = outputNode.SelectNodes("def:includes/def:assembly", namespaceManager);
+            XmlNodeList includesAssemblyNodes = outputNode.SelectNodes("def:includes/def:assemblies/def:assembly", namespaceManager);
             // ReSharper disable PossibleNullReferenceException
             foreach (XmlNode assemblyNode in includesAssemblyNodes) {
                 // ReSharper restore PossibleNullReferenceException
-                IncludedAssemblyConfig assemblyConfigByRef = GetIncludedAssemblyConfigByID(assemblyNode.Attributes["ref"].Value);
+                IncludedAssemblyConfig assemblyConfigByRef = GetAssemblyConfigByID(assemblyNode.Attributes["ref"].Value);
                 if (assemblyConfigByRef == null) {
                     throw new InvalidOperationException(String.Format("Cannot find assembly to include by ID='{0}'.", assemblyNode.Attributes["ref"].Value));
                 }
                 includedObjects.Add(assemblyConfigByRef);
             }
             //
-            XmlNodeList includesFileNodes = outputNode.SelectNodes("def:includes/def:file", namespaceManager);
+            XmlNodeList includesFileNodes = outputNode.SelectNodes("def:includes/def:files/def:file", namespaceManager);
             // ReSharper disable PossibleNullReferenceException
             foreach (XmlNode includesFileNode in includesFileNodes) {
                 // ReSharper restore PossibleNullReferenceException
-                IncludedFileConfig fileConfigByRef = GetIncludedFileConfigByID(includesFileNode.Attributes["ref"].Value);
+                IncludedFileConfig fileConfigByRef = GetFileConfigByID(includesFileNode.Attributes["ref"].Value);
                 if (fileConfigByRef == null) {
                     throw new InvalidOperationException(String.Format("Cannot find file to include by ID='{0}'.", includesFileNode.Attributes["ref"]));
                 }
                 includedObjects.Add(fileConfigByRef);
             }
-//            //
-//            XmlNodeList referencesNodes = outputNode.SelectNodes("def:references/def:reference", namespaceManager);
-//// ReSharper disable PossibleNullReferenceException
-//            foreach (XmlNode referenceNode in referencesNodes) {
-//// ReSharper restore PossibleNullReferenceException
-//                references.Add(referenceNode.Attributes["path"].Value);
-//            }
         }
 
         private static void schemaValidationEventHandler(object sender, ValidationEventArgs args) {
@@ -399,7 +384,7 @@ namespace NBox.Config
 
             // Assemblies
             XmlElement assembliesElement = document.CreateElement("assemblies");
-            foreach (IncludedAssemblyConfig assemblyConfig in includedAssemblyConfigs) {
+            foreach (IncludedAssemblyConfig assemblyConfig in this.assemblyConfigs) {
                 XmlElement includedObjectConfigElement = document.CreateElement(assemblyConfig.GetXmlNodeDefaultName());
                 assemblyConfig.XmlExport(includedObjectConfigElement);
                 assembliesElement.AppendChild(includedObjectConfigElement);
@@ -408,7 +393,7 @@ namespace NBox.Config
 
             // Files
             XmlElement filesElement = document.CreateElement("files");
-            foreach (IncludedFileConfig fileConfig in includedFileConfigs) {
+            foreach (IncludedFileConfig fileConfig in this.fileConfigs) {
                 XmlElement includedObjectConfigElement = document.CreateElement(fileConfig.GetXmlNodeDefaultName());
                 fileConfig.XmlExport(includedObjectConfigElement);
                 filesElement.AppendChild(includedObjectConfigElement);
@@ -444,14 +429,27 @@ namespace NBox.Config
             }
 
             XmlElement includesElement = document.CreateElement("includes");
+
+            XmlElement includesAssembliesElement = document.CreateElement("assemblies");
+            XmlElement includesFilesElement = document.CreateElement("files");
+            //
             foreach (IncludedObjectConfigBase configBase in includedObjects) {
+                // will create element with name "assembly" or "file"
                 XmlElement includedObjectElement = document.CreateElement(configBase.GetXmlNodeDefaultName());
                 XmlAttribute includedObjectRefAttribute = document.CreateAttribute("ref");
                 includedObjectRefAttribute.Value = configBase.ID;
                 includedObjectElement.Attributes.Append(includedObjectRefAttribute);
                 //
-                includesElement.AppendChild(includedObjectElement);
+                if (configBase is IncludedAssemblyConfig) {
+                    includesAssembliesElement.AppendChild(includedObjectElement);
+                } else if (configBase is IncludedFileConfig) {
+                    includesFilesElement.AppendChild(includedObjectElement);
+                }
             }
+            //
+            includesElement.AppendChild(includesAssembliesElement);
+            includesElement.AppendChild(includesFilesElement);
+
             outputElement.AppendChild(includesElement);
 
             configurationElement.AppendChild(outputElement);
