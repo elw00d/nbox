@@ -37,31 +37,50 @@ namespace NBox.Config
 
         private readonly List<CompressionConfig> compressionConfigs = new List<CompressionConfig>();
 
+        private readonly List<IncludedAssemblyConfig> assemblyConfigs = new List<IncludedAssemblyConfig>();
+
+        private readonly List<IncludedFileConfig> fileConfigs = new List<IncludedFileConfig>();
+
+        private readonly OutputConfig outputConfig;
+
+        public OutputConfig OutputConfig {
+            get {
+                return (outputConfig);
+            }
+        }
+
+        private readonly string targetNamespace;
+
         private void addCompressionConfigToList(CompressionConfig compressionConfig) {
             if (GetCompressionConfigByID(compressionConfig.ID) != null) {
                 throw new InvalidOperationException(ERROR_ID_ALREADY_EXISTS);
             }
-            compressionConfigs.Add(compressionConfig);
+            this.compressionConfigs.Add(compressionConfig);
         }
-
-        [CanBeNull]
-        public CompressionConfig GetCompressionConfigByID(string id) {
-            foreach (CompressionConfig compressionConfig in compressionConfigs) {
-                if (compressionConfig.ID == id) {
-                    return (compressionConfig);
-                }
-            }
-            //
-            return (null);
-        }
-
-        private readonly List<IncludedAssemblyConfig> assemblyConfigs = new List<IncludedAssemblyConfig>();
 
         private void addAssemblyConfigToList(IncludedAssemblyConfig includedAssemblyConfig) {
             if (GetAssemblyConfigByID(includedAssemblyConfig.ID) != null) {
                 throw new InvalidOperationException(ERROR_ID_ALREADY_EXISTS);
             }
             this.assemblyConfigs.Add(includedAssemblyConfig);
+        }
+
+        private void addFileConfigToList(IncludedFileConfig includedFileConfig) {
+            if (GetFileConfigByID(includedFileConfig.ID) != null) {
+                throw new InvalidOperationException(ERROR_ID_ALREADY_EXISTS);
+            }
+            this.fileConfigs.Add(includedFileConfig);
+        }
+
+        [CanBeNull]
+        public CompressionConfig GetCompressionConfigByID(string id) {
+            foreach (CompressionConfig compressionConfig in this.compressionConfigs) {
+                if (compressionConfig.ID == id) {
+                    return (compressionConfig);
+                }
+            }
+            //
+            return (null);
         }
 
         [CanBeNull]
@@ -75,15 +94,6 @@ namespace NBox.Config
             return (null);
         }
 
-        private readonly List<IncludedFileConfig> fileConfigs = new List<IncludedFileConfig>();
-
-        private void addFileConfigToList(IncludedFileConfig includedFileConfig) {
-            if (GetFileConfigByID(includedFileConfig.ID) != null) {
-                throw new InvalidOperationException(ERROR_ID_ALREADY_EXISTS);
-            }
-            this.fileConfigs.Add(includedFileConfig);
-        }
-
         [CanBeNull]
         public IncludedFileConfig GetFileConfigByID(string id) {
             foreach (IncludedFileConfig includedFileConfig in this.fileConfigs) {
@@ -95,63 +105,19 @@ namespace NBox.Config
             return (null);
         }
 
-        private readonly OutputAppType outputAppType;
+        private readonly string defaultCompressionConfigRefForAssemblies = null;
 
-        public OutputAppType OutputAppType {
-            get {
-                return (outputAppType);
-            }
-        }
+        private readonly IncludeMethodKind defaultIncludeMethodKindForAssemblies = IncludeMethodKind.Resource;
 
-        private readonly OutputMachine outputMachine;
+        private readonly bool defaultGeneratePartialAliasesForAssemblies = true;
 
-        public OutputMachine OutputMachine {
-            get {
-                return (outputMachine);
-            }
-        }
+        private readonly bool defaultLazyLoadForAssemblies = true;
 
-        private readonly string outputPath;
+        private string defaultCompressionConfigRefForFiles = null;
 
-        public string OutputPath {
-            get {
-                return (outputPath);
-            }
-        }
+        private IncludeMethodKind defaultIncludeMethodKindForFiles = IncludeMethodKind.Overlay;
 
-        private readonly string outputWin32IconPath;
-
-        public string OutputWin32IconPath {
-            get {
-                return (outputWin32IconPath);
-            }
-        }
-
-        private readonly IncludedAssemblyConfig mainAssembly;
-
-        public IncludedAssemblyConfig MainAssembly {
-            get {
-                return (mainAssembly);
-            }
-        }
-
-        private readonly List<IncludedObjectConfigBase> includedObjects = new List<IncludedObjectConfigBase>();
-
-        public IList<IncludedObjectConfigBase> IncludedObjects {
-            get {
-                return (includedObjects);
-            }
-        }
-
-        private readonly ApartmentState outputApartmentState;
-
-        public ApartmentState OutputApartmentState {
-            get {
-                return (outputApartmentState);
-            }
-        }
-
-        private readonly string targetNamespace;
+        private OverwritingOptions defaultOverwritingOptionsForFiles = OverwritingOptions.Always;
 
         public BuildConfiguration(XmlDocument document, BuildConfigurationVariables variables) {
             ArgumentChecker.NotNull(document, "document");
@@ -191,18 +157,40 @@ namespace NBox.Config
                 if (levelNode == null) {
                     throw new InvalidOperationException("Cannot determine the level of compression.");
                 }
-                CompressionLevel compressionLevel = (CompressionLevel) Enum.Parse(typeof (CompressionLevel), levelNode.Attributes["value"].Value, true);
+                CompressionLevel compressionLevel = (CompressionLevel)Enum.Parse(typeof(CompressionLevel), levelNode.Attributes["value"].Value, true);
                 CompressionConfig compressionConfig = new CompressionConfig(id, compressionLevel);
                 addCompressionConfigToList(compressionConfig);
             }
             // Parsing included assemblies options
+            XmlNode assembliesNode = document.SelectSingleNode("def:configuration/def:assemblies", namespaceManager);
+            if (assembliesNode != null) {
+                if (assembliesNode.Attributes["default-compression-ref"] != null) {
+                    this.defaultCompressionConfigRefForAssemblies = assembliesNode.Attributes["default-compression-ref"].Value;
+                }
+                if (assembliesNode.Attributes["default-include-method"] != null) {
+                    this.defaultIncludeMethodKindForAssemblies = (IncludeMethodKind) Enum.Parse(typeof (IncludeMethodKind),
+                        assembliesNode.Attributes["default-include-method"].Value, true);
+                }
+                if (assembliesNode.Attributes["default-generate-partial-aliases"] != null) {
+                    this.defaultGeneratePartialAliasesForAssemblies = bool.Parse(assembliesNode.Attributes["default-generate-partial-aliases"].Value);
+                }
+                if (assembliesNode.Attributes["default-lazy-load"] != null) {
+                    this.defaultLazyLoadForAssemblies = bool.Parse(assembliesNode.Attributes["default-lazy-load"].Value);
+                }
+            }
+            //
             XmlNodeList assemblyNodes = document.SelectNodes("def:configuration/def:assemblies/def:assembly", namespaceManager);
             // ReSharper disable PossibleNullReferenceException
             foreach (XmlNode assemblyNode in assemblyNodes) {
                 // ReSharper restore PossibleNullReferenceException
                 string idAttributeValue = assemblyNode.Attributes["id"].Value;
                 string pathAttributeValue = assemblyNode.Attributes["path"].Value;
-                string compressionRefAttributeValue = assemblyNode.Attributes["compression-ref"].Value;
+                string compressionRefAttributeValue;
+                if (assemblyNode.Attributes["compression-ref"] != null) {
+                    compressionRefAttributeValue = assemblyNode.Attributes["compression-ref"].Value;
+                } else {
+                    compressionRefAttributeValue = this.defaultCompressionConfigRefForAssemblies;
+                }
                 //
                 string copyCompressedToAttributeValue = String.Empty;
                 if (assemblyNode.Attributes["copy-compressed-to"] != null) {
@@ -213,20 +201,19 @@ namespace NBox.Config
                     throw new InvalidOperationException("Requested compression option was not found.");
                 }
                 //
-                IncludeMethod includeMethod = IncludeMethod.Parse(assemblyNode);
+                IncludeMethod includeMethod = (assemblyNode.Attributes["include-method"] != null)
+                    ? IncludeMethod.Parse(assemblyNode)
+                    : new IncludeMethod(this.defaultIncludeMethodKindForAssemblies);
                 // Specially for assembly attributes
-                bool lazyLoadAttributeValue = true;
+                bool lazyLoadAttributeValue = defaultLazyLoadForAssemblies;
                 if (assemblyNode.Attributes["lazy-load"] != null) {
                     lazyLoadAttributeValue = bool.Parse(assemblyNode.Attributes["lazy-load"].Value);
                 }
                 //
-                bool generatePartiallyAliasesAttributeValue = IncludedAssemblyConfig.GENERATE_PARTIALLY_ALIASES_DEFAULT;
-                XmlNode aliasesNode = assemblyNode.SelectSingleNode("def:aliases", namespaceManager);
-                if (aliasesNode != null) {
-                    XmlAttribute generatePartiallyAliasesAttribute = aliasesNode.Attributes["generate-partially-aliases"];
-                    if (generatePartiallyAliasesAttribute != null) {
-                        generatePartiallyAliasesAttributeValue = bool.Parse(generatePartiallyAliasesAttribute.Value);
-                    }
+                bool generatePartialAliasesAttributeValue = defaultGeneratePartialAliasesForAssemblies;
+                XmlAttribute generatePartialAliasesAttribute = assemblyNode.Attributes["generate-partial-aliases"];
+                if (generatePartialAliasesAttribute != null) {
+                    generatePartialAliasesAttributeValue = bool.Parse(generatePartialAliasesAttribute.Value);
                 }
                 //
                 List<string> aliases = new List<string>();
@@ -244,16 +231,36 @@ namespace NBox.Config
                 addAssemblyConfigToList(new IncludedAssemblyConfig(idAttributeValue,
                     includeMethod, pathAttributeValue, compressionConfigByRef,
                     copyCompressedToAttributeValue, lazyLoadAttributeValue, aliases,
-                    generatePartiallyAliasesAttributeValue));
+                    generatePartialAliasesAttributeValue));
             }
             // Parsing included files options
+            XmlNode filesNode = document.SelectSingleNode("def:configuration/def:files", namespaceManager);
+            if (filesNode != null) {
+                if (filesNode.Attributes["default-compression-ref"] != null) {
+                    this.defaultCompressionConfigRefForFiles = filesNode.Attributes["default-compression-ref"].Value;
+                }
+                if (filesNode.Attributes["default-include-method"] != null) {
+                    this.defaultIncludeMethodKindForFiles = (IncludeMethodKind)Enum.Parse(typeof(IncludeMethodKind),
+                        filesNode.Attributes["default-include-method"].Value, true);
+                }
+                if (filesNode.Attributes["default-overwrite-on-extracting"] != null) {
+                    this.defaultOverwritingOptionsForFiles = (OverwritingOptions) Enum.Parse(typeof (OverwritingOptions),
+                        filesNode.Attributes["default-overwrite-on-extracting"].Value, true);
+                }
+            }
+            //
             XmlNodeList fileNodes = document.SelectNodes("def:configuration/def:files/def:file", namespaceManager);
             // ReSharper disable PossibleNullReferenceException
             foreach (XmlNode fileNode in fileNodes) {
                 // ReSharper restore PossibleNullReferenceException
                 string idAttributeValue = fileNode.Attributes["id"].Value;
                 string pathAttributeValue = fileNode.Attributes["path"].Value;
-                string compressionRefAttributeValue = fileNode.Attributes["compression-ref"].Value;
+                string compressionRefAttributeValue;
+                if (fileNode.Attributes["compression-ref"] != null) {
+                    compressionRefAttributeValue = fileNode.Attributes["compression-ref"].Value;
+                } else {
+                    compressionRefAttributeValue = this.defaultCompressionConfigRefForFiles;
+                }
                 //
                 string copyCompressedToAttributeValue = String.Empty;
                 if (fileNode.Attributes["copy-compressed-to"] != null) {
@@ -264,7 +271,12 @@ namespace NBox.Config
                     throw new InvalidOperationException("Requested compression option was not found.");
                 }
                 //
-                IncludeMethod includeMethod = IncludeMethod.Parse(fileNode);
+                IncludeMethod includeMethod;
+                if (fileNode.Attributes["include-method"] != null) {
+                    includeMethod = IncludeMethod.Parse(fileNode);
+                } else {
+                    includeMethod = new IncludeMethod(this.defaultIncludeMethodKindForFiles);
+                }
                 // Speciallied for file attributes
                 string extractToPathAttributeValue = String.Empty;
                 XmlAttribute extractToPathAttribute = fileNode.Attributes["extract-to-path"];
@@ -272,10 +284,10 @@ namespace NBox.Config
                     extractToPathAttributeValue = extractToPathAttribute.Value;
                 }
                 //
-                OverwritingOptions overwritingOptionsAttributeValue = OverwritingOptions.Always;
+                OverwritingOptions overwritingOptionsAttributeValue = defaultOverwritingOptionsForFiles;
                 XmlAttribute overwritingOptionsAttribute = fileNode.Attributes["overwrite-on-extracting"];
                 if (overwritingOptionsAttribute != null) {
-                    overwritingOptionsAttributeValue = (OverwritingOptions) Enum.Parse(typeof (OverwritingOptions), overwritingOptionsAttribute.Value, true);
+                    overwritingOptionsAttributeValue = (OverwritingOptions)Enum.Parse(typeof(OverwritingOptions), overwritingOptionsAttribute.Value, true);
                 }
                 //
                 addFileConfigToList(new IncludedFileConfig(idAttributeValue,
@@ -283,15 +295,22 @@ namespace NBox.Config
                     copyCompressedToAttributeValue, extractToPathAttributeValue, overwritingOptionsAttributeValue));
             }
             // Parsing output configuration
+            ApartmentState outputApartmentState;
+            string outputPath;
+            OutputAppType outputAppType;
+            OutputMachine outputMachine;
+            IncludedAssemblyConfig mainAssembly;
+            string outputWin32IconPath = null;
+            //
             XmlNode outputNode = document.SelectSingleNode("def:configuration/def:output", namespaceManager);
             if (outputNode == null) {
                 throw new InvalidOperationException("Unable to find an output exe configuration.");
             }
             //
-            this.outputApartmentState = (ApartmentState) Enum.Parse(typeof (ApartmentState), outputNode.Attributes["apartment"].Value, true);
-            this.outputPath = outputNode.Attributes["path"].Value;
-            outputAppType = (OutputAppType) Enum.Parse(typeof (OutputAppType), outputNode.Attributes["apptype"].Value, true);
-            outputMachine = (OutputMachine) Enum.Parse(typeof (OutputMachine), outputNode.Attributes["machine"].Value, true);
+            outputApartmentState = (ApartmentState)Enum.Parse(typeof(ApartmentState), outputNode.Attributes["apartment"].Value, true);
+            outputPath = outputNode.Attributes["path"].Value;
+            outputAppType = (OutputAppType)Enum.Parse(typeof(OutputAppType), outputNode.Attributes["apptype"].Value, true);
+            outputMachine = (OutputMachine)Enum.Parse(typeof(OutputMachine), outputNode.Attributes["machine"].Value, true);
             mainAssembly = GetAssemblyConfigByID(outputNode.Attributes["main-assembly-ref"].Value);
             if (mainAssembly == null) {
                 throw new InvalidOperationException("Main assembly specified with incorrect ID.");
@@ -302,6 +321,9 @@ namespace NBox.Config
                 outputWin32IconPath = outputWin32IconAttribute.Value;
             }
             //
+            this.outputConfig = new OutputConfig(outputAppType, outputMachine, outputPath,
+                outputWin32IconPath, mainAssembly, outputApartmentState);
+            //
             XmlNodeList includesAssemblyNodes = outputNode.SelectNodes("def:includes/def:assemblies/def:assembly", namespaceManager);
             // ReSharper disable PossibleNullReferenceException
             foreach (XmlNode assemblyNode in includesAssemblyNodes) {
@@ -310,7 +332,7 @@ namespace NBox.Config
                 if (assemblyConfigByRef == null) {
                     throw new InvalidOperationException(String.Format("Cannot find assembly to include by ID='{0}'.", assemblyNode.Attributes["ref"].Value));
                 }
-                includedObjects.Add(assemblyConfigByRef);
+                outputConfig.IncludedObjects.Add(assemblyConfigByRef);
             }
             //
             XmlNodeList includesFileNodes = outputNode.SelectNodes("def:includes/def:files/def:file", namespaceManager);
@@ -321,8 +343,9 @@ namespace NBox.Config
                 if (fileConfigByRef == null) {
                     throw new InvalidOperationException(String.Format("Cannot find file to include by ID='{0}'.", includesFileNode.Attributes["ref"]));
                 }
-                includedObjects.Add(fileConfigByRef);
+                outputConfig.IncludedObjects.Add(fileConfigByRef);
             }
+            //
         }
 
         private static void schemaValidationEventHandler(object sender, ValidationEventArgs args) {
@@ -403,28 +426,28 @@ namespace NBox.Config
             // Output options serialization
             XmlElement outputElement = document.CreateElement("output");
             XmlAttribute outputPathAttribute = document.CreateAttribute("path");
-            outputPathAttribute.Value = this.outputPath;
+            outputPathAttribute.Value = this.outputConfig.OutputPath;
             outputElement.Attributes.Append(outputPathAttribute);
 
             XmlAttribute outputAppTypeAttribute = document.CreateAttribute("apptype");
-            outputAppTypeAttribute.Value = Convert.ToString(this.outputAppType);
+            outputAppTypeAttribute.Value = Convert.ToString(this.outputConfig.OutputAppType);
             outputElement.Attributes.Append(outputAppTypeAttribute);
 
             XmlAttribute outputMachineAttribute = document.CreateAttribute("machine");
-            outputMachineAttribute.Value = Convert.ToString(this.outputMachine);
+            outputMachineAttribute.Value = Convert.ToString(this.outputConfig.OutputMachine);
             outputElement.Attributes.Append(outputMachineAttribute);
 
             XmlAttribute outputMainAssemblyRefAttribute = document.CreateAttribute("main-assembly-ref");
-            outputMainAssemblyRefAttribute.Value = this.mainAssembly.ID;
+            outputMainAssemblyRefAttribute.Value = this.outputConfig.MainAssembly.ID;
             outputElement.Attributes.Append(outputMainAssemblyRefAttribute);
 
             XmlAttribute outputApartmentAttribute = document.CreateAttribute("apartment");
-            outputApartmentAttribute.Value = Convert.ToString(this.outputApartmentState);
+            outputApartmentAttribute.Value = Convert.ToString(this.outputConfig.OutputApartmentState);
             outputElement.Attributes.Append(outputApartmentAttribute);
 
-            if (!String.IsNullOrEmpty(outputWin32IconPath)) {
+            if (!String.IsNullOrEmpty(this.outputConfig.OutputWin32IconPath)) {
                 XmlAttribute outputWin32IconAttribute = document.CreateAttribute("win32icon");
-                outputWin32IconAttribute.Value = outputWin32IconPath;
+                outputWin32IconAttribute.Value = this.outputConfig.OutputWin32IconPath;
                 outputElement.Attributes.Append(outputWin32IconAttribute);
             }
 
@@ -433,7 +456,7 @@ namespace NBox.Config
             XmlElement includesAssembliesElement = document.CreateElement("assemblies");
             XmlElement includesFilesElement = document.CreateElement("files");
             //
-            foreach (IncludedObjectConfigBase configBase in includedObjects) {
+            foreach (IncludedObjectConfigBase configBase in outputConfig.IncludedObjects) {
                 // will create element with name "assembly" or "file"
                 XmlElement includedObjectElement = document.CreateElement(configBase.GetXmlNodeDefaultName());
                 XmlAttribute includedObjectRefAttribute = document.CreateAttribute("ref");

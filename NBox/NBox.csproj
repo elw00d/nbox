@@ -62,6 +62,7 @@
     <Compile Include="Config\IncludedObjectConfigBase.cs" />
     <Compile Include="Config\IncludeMethod.cs" />
     <Compile Include="Config\ISerializableToXmlNode.cs" />
+    <Compile Include="Config\OutputConfig.cs" />
     <Compile Include="Lzma\Common\CommandLineParser.cs" />
     <Compile Include="Lzma\Common\CRC.cs" />
     <Compile Include="Lzma\Common\InBuffer.cs" />

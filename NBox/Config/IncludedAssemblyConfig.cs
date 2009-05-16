@@ -7,8 +7,6 @@ namespace NBox.Config
 {
     public sealed class IncludedAssemblyConfig : IncludedObjectConfigBase
     {
-        public const bool LAZY_LOAD_DEFAULT = true;
-
         private readonly bool lazyLoad;
 
         public bool LazyLoad {
@@ -17,13 +15,11 @@ namespace NBox.Config
             }
         }
 
-        public const bool GENERATE_PARTIALLY_ALIASES_DEFAULT = false;
+        private readonly bool generatePartialAliases;
 
-        private readonly bool generatePartiallyAliases;
-
-        public bool GeneratePartiallyAliases {
+        public bool GeneratePartialAliases {
             get {
-                return (generatePartiallyAliases);
+                return (this.generatePartialAliases);
             }
         }
 
@@ -35,17 +31,6 @@ namespace NBox.Config
             }
         }
 
-
-        public IncludedAssemblyConfig(string id, IncludeMethod includeMethod, string path, CompressionConfig compressionConfig, string copyCompressedTo, bool lazyLoad, IEnumerable<string> aliases)
-            : base(id, includeMethod, path, compressionConfig, copyCompressedTo) {
-            //
-            ArgumentChecker.NotNull(aliases, "aliases");
-            //
-            this.lazyLoad = lazyLoad;
-            this.aliases = new List<string>(aliases);
-            this.generatePartiallyAliases = GENERATE_PARTIALLY_ALIASES_DEFAULT;
-        }
-
         public IncludedAssemblyConfig(string id, IncludeMethod includeMethod, string path, CompressionConfig compressionConfig, string copyCompressedTo, bool lazyLoad, IEnumerable<string> aliases, bool generatePartiallyAliases)
             : base(id, includeMethod, path, compressionConfig, copyCompressedTo) {
             //
@@ -53,7 +38,7 @@ namespace NBox.Config
             //
             this.lazyLoad = lazyLoad;
             this.aliases = new List<string>(aliases);
-            this.generatePartiallyAliases = generatePartiallyAliases;
+            this.generatePartialAliases = generatePartiallyAliases;
         }
 
 #if !LOADER
@@ -62,11 +47,9 @@ namespace NBox.Config
             //
             XmlDocument ownerDocument = xmlNode.OwnerDocument;
 
-            if (lazyLoad != LAZY_LOAD_DEFAULT) {
-                XmlAttribute lazyLoadAttribute = ownerDocument.CreateAttribute("lazy-load");
-                lazyLoadAttribute.Value = this.lazyLoad.ToString().ToLower();
-                xmlNode.Attributes.Append(lazyLoadAttribute);
-            }
+            XmlAttribute lazyLoadAttribute = ownerDocument.CreateAttribute("lazy-load");
+            lazyLoadAttribute.Value = this.lazyLoad.ToString().ToLower();
+            xmlNode.Attributes.Append(lazyLoadAttribute);
 
             XmlElement aliasesElement = ownerDocument.CreateElement("aliases");
             foreach (string alias in aliases) {
@@ -77,11 +60,10 @@ namespace NBox.Config
                 //
                 aliasesElement.AppendChild(aliasElement);
             }
-            if (generatePartiallyAliases != GENERATE_PARTIALLY_ALIASES_DEFAULT) {
-                XmlAttribute generatePartiallyAliasesAttribute = ownerDocument.CreateAttribute("generate-partially-aliases");
-                generatePartiallyAliasesAttribute.Value = this.generatePartiallyAliases.ToString().ToLower();
-                aliasesElement.Attributes.Append(generatePartiallyAliasesAttribute);
-            }
+            XmlAttribute generatePartialAliasesAttribute = ownerDocument.CreateAttribute("generate-partial-aliases");
+            generatePartialAliasesAttribute.Value = this.generatePartialAliases.ToString().ToLower();
+            xmlNode.Attributes.Append(generatePartialAliasesAttribute);
+
             xmlNode.AppendChild(aliasesElement);
         }
 #else

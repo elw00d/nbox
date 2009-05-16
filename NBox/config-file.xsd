@@ -11,6 +11,15 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="overwrite-on-extracting-type">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Always"/>
+      <xs:enumeration value="CheckExist"/>
+      <xs:enumeration value="CheckSize"/>
+      <xs:enumeration value="Never"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <xs:element name="configuration">
     <xs:complexType>
       <xs:sequence>
@@ -54,27 +63,30 @@
                             </xs:complexType>
                           </xs:element>
                         </xs:sequence>
-                        <xs:attribute name="generate-partially-aliases" use="optional"/>
                       </xs:complexType>
                     </xs:element>
                   </xs:sequence>
                   <!-- Required main options -->
                   <xs:attribute name="id" type="xs:string" use="required" />
                   <xs:attribute name="path" type="xs:string" use="required" />
-                  <xs:attribute name="compression-ref" type="xs:string" use="required" />
+                  <xs:attribute name="compression-ref" type="xs:string" use="optional" />
                   <xs:attribute name="copy-compressed-to" type="xs:string" use="optional" />
                   <!-- Include method and its properties -->
-                  <xs:attribute name="include-method" use="required" type="own:include-method-type"/>
+                  <xs:attribute name="include-method" use="optional" type="own:include-method-type"/>
                   <xs:attribute name="file-load-from-path" type="xs:string" use="optional"/>
                   <xs:attribute name="overlay-offset" type="xs:string" use="optional" />
                   <xs:attribute name="overlay-length" type="xs:string" use="optional" />
                   <xs:attribute name="resource-name" type="xs:string" use="optional" />
                   <!-- Specially for assembly -->
                   <xs:attribute name="lazy-load" type="xs:boolean" use="optional" />
+                  <xs:attribute name="generate-partial-aliases" type="xs:boolean" use="optional"/>
                 </xs:complexType>
-
               </xs:element>
             </xs:sequence>
+            <xs:attribute name="default-compression-ref" type="xs:string" use="optional" />
+            <xs:attribute name="default-include-method" type="own:include-method-type" use="optional" />
+            <xs:attribute name="default-generate-partial-aliases" type="xs:boolean" use="optional" />
+            <xs:attribute name="default-lazy-load" type="xs:boolean" use="optional" />
           </xs:complexType>
 
           <xs:keyref name="assembly-compression-option-ref" refer="own:compression-option-id" >
@@ -98,28 +110,24 @@
                   <!-- Required main options -->
                   <xs:attribute name="id" type="xs:string" use="required" />
                   <xs:attribute name="path" type="xs:string" use="required" />
-                  <xs:attribute name="compression-ref" type="xs:string" use="required" />
+                  <xs:attribute name="compression-ref" type="xs:string" use="optional" />
                   <xs:attribute name="copy-compressed-to" type="xs:string" use="optional" />
                   <!-- Include method and its properties -->
-                  <xs:attribute name="include-method" use="required" type="own:include-method-type"/>
+                  <xs:attribute name="include-method" use="optional" type="own:include-method-type"/>
                   <xs:attribute name="file-load-from-path" type="xs:string" use="optional"/>
                   <xs:attribute name="overlay-offset" type="xs:string" use="optional" />
                   <xs:attribute name="overlay-length" type="xs:string" use="optional" />
                   <xs:attribute name="resource-name" type="xs:string" use="optional" />
                   <!-- Specially for file -->
                   <xs:attribute name="extract-to-path" type="xs:string" use="optional" />
-                  <xs:attribute name="overwrite-on-extracting" use="optional">
-                    <xs:simpleType>
-                      <xs:restriction base="xs:string">
-                        <xs:enumeration value="Always"/>
-                        <xs:enumeration value="CheckExist"/>
-                        <xs:enumeration value="CheckSize"/>
-                      </xs:restriction>
-                    </xs:simpleType>
-                  </xs:attribute>
+                  <xs:attribute name="overwrite-on-extracting" type="own:overwrite-on-extracting-type" use="optional"/>
                 </xs:complexType>
               </xs:element>
             </xs:sequence>
+
+            <xs:attribute name="default-include-method" type="own:include-method-type" use="optional"/>
+            <xs:attribute name="default-compression-ref" type="xs:string" use="optional"/>
+            <xs:attribute name="default-overwrite-on-extracting" type="own:overwrite-on-extracting-type" use="optional"/>
           </xs:complexType>
 
           <xs:keyref name="file-compression-option-ref" refer="own:compression-option-id" >

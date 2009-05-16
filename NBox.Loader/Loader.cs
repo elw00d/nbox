@@ -9,17 +9,29 @@ using NBox.Utils;
 
 namespace NBox.Loader
 {
+    /// <summary>
+    /// Main class of loader.
+    /// </summary>
     internal class Loader
     {
+        private const string MAIN_ASSEMBLY_DIR_VARIABLE = "%mainassemblydir%";
+        private const string SYSTEM32_DIR_VARIABLE = "%system32dir%";
+
         private static readonly BuildConfiguration configuration;
 
         private static readonly string mainAssemblyDirectoryName;
 
         private static readonly string system32DirectoryName;
 
+        /// <summary>
+        /// Dictionary of included assemblies.
+        /// </summary>
         private static readonly Dictionary<string, IncludedAssemblyConfig> assembliesByAliases =
             new Dictionary<string, IncludedAssemblyConfig>();
 
+        /// <summary>
+        /// In static constructor configuration of included objects is loaded from resources.
+        /// </summary>
         static Loader() {
             try {
                 // Configuration initialization
@@ -40,8 +52,8 @@ namespace NBox.Loader
                 mainAssemblyDirectoryName = Path.GetDirectoryName(executingAssembly.Location);
                 system32DirectoryName = Environment.SystemDirectory;
                 // Initialization dictionary of aliases
-                IList<IncludedObjectConfigBase> includedObjects = configuration.IncludedObjects;
-                includedObjects.Add(configuration.MainAssembly);
+                IList<IncludedObjectConfigBase> includedObjects = configuration.OutputConfig.IncludedObjects;
+                includedObjects.Add(configuration.OutputConfig.MainAssembly);
                 //
                 foreach (IncludedObjectConfigBase configBase in includedObjects) {
                     if (configBase is IncludedAssemblyConfig) {
@@ -59,12 +71,12 @@ namespace NBox.Loader
             }
         }
 
-        static int Main(string[] args) {
+        private static int Main(string[] args) {
             AppDomain.CurrentDomain.AssemblyResolve += CurrentDomainOnAssemblyResolve;
             //
             try {
                 // Initial extracting files
-                foreach (IncludedObjectConfigBase configBase in configuration.IncludedObjects) {
+                foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.IncludedObjects) {
                     if (configBase is IncludedFileConfig) {
                         IncludedFileConfig fileConfig = configBase as IncludedFileConfig;
                         string configuredExtractingPath = configurePath(fileConfig.ExtractToPath);
@@ -78,6 +90,8 @@ namespace NBox.Loader
                         } else if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckSize) {
                             bytes = loadRawData(fileConfig, out decodedDataLength);
                             extracting = !File.Exists(configuredExtractingPath) || new FileInfo(configuredExtractingPath).Length != bytes.Length;
+                        } else if (fileConfig.OverwriteOnExtract == OverwritingOptions.Never) {
+                            extracting = false;
                         }
                         //
                         if (extracting) {
@@ -92,7 +106,7 @@ namespace NBox.Loader
                     }
                 }
                 // Initial loading assemblies with lazy-load = false attribute
-                foreach (IncludedObjectConfigBase configBase in configuration.IncludedObjects) {
+                foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.IncludedObjects) {
                     if (configBase is IncludedAssemblyConfig) {
                         IncludedAssemblyConfig assemblyConfig = configBase as IncludedAssemblyConfig;
                         if (!assemblyConfig.LazyLoad) {
@@ -101,7 +115,7 @@ namespace NBox.Loader
                     }
                 }
                 // Starting application
-                Assembly assembly = loadAssembly(configuration.MainAssembly);
+                Assembly assembly = loadAssembly(configuration.OutputConfig.MainAssembly);
                 if (assembly == null) {
                     throw new InvalidOperationException("Cannot load main module.");
                 }
@@ -117,7 +131,7 @@ namespace NBox.Loader
                     // Starting thread with selected ThreadApartment
                     Thread threadWithApartment = new Thread(start);
                     threadWithApartment.IsBackground = false;
-                    threadWithApartment.SetApartmentState(configuration.OutputApartmentState);
+                    threadWithApartment.SetApartmentState(configuration.OutputConfig.OutputApartmentState);
                     threadWithApartment.Start(entryPoint);
                     threadWithApartment.Join();
                 }
@@ -131,6 +145,9 @@ namespace NBox.Loader
 
         private static object returnedValue = null;
 
+        /// <summary>
+        /// Starts aggregated application.
+        /// </summary>
         private static void start(object o) {
             try {
                 returnedValue = ((MethodInfo) o).Invoke(null, parametersArr);
@@ -140,10 +157,16 @@ namespace NBox.Loader
             }
         }
 
+        /// <summary>
+        /// This variable used to calculate overlay position relative to file begin.
+        /// </summary>
         private static int inititalOverlayOffset = 0;
         
         private static object[] parametersArr;
 
+        /// <summary>
+        /// Retrieves decompressed data block for specified config of included object.
+        /// </summary>
         private static byte[] loadRawData(IncludedObjectConfigBase configBase, out long rawDataLength) {
             byte[] bytes;
             //
@@ -199,6 +222,9 @@ namespace NBox.Loader
             return (LzmaHelper.Decode(bytes, bytes.LongLength, out rawDataLength));
         }
 
+        /// <summary>
+        /// Loads assembly from assemblies cache or if not found, from raw data.
+        /// </summary>
         private static Assembly loadAssembly(IncludedObjectConfigBase assemblyConfig) {
             Assembly alreadyCachedAssembly;
             if (AssembliesCachedRegistry.TryGetCachedAssembly(assemblyConfig.ID, out alreadyCachedAssembly)) {
@@ -212,33 +238,42 @@ namespace NBox.Loader
             return (assembly);
         }
 
+        /// <summary>
+        /// Configures path using actual variables.
+        /// </summary>
         private static string configurePath(string configurablePath) {
+            ArgumentChecker.NotNullOrEmpty(configurablePath, "configurablePath");
+            //
             configurablePath = configurablePath.Replace('/', Path.DirectorySeparatorChar);
-            if (configurablePath.Contains("%mainassemblydir%")) {
-                string endOfPath = configurablePath.Replace("%mainassemblydir%", String.Empty);
-                if (!String.IsNullOrEmpty(endOfPath) && endOfPath[0] == Path.DirectorySeparatorChar) {
-                    endOfPath = endOfPath.Substring(1);
-                }
-                if (!String.IsNullOrEmpty(endOfPath)) {
-                    return (Path.Combine(mainAssemblyDirectoryName, endOfPath));
-                }
-                return (mainAssemblyDirectoryName);
+            if (configurablePath.Contains(MAIN_ASSEMBLY_DIR_VARIABLE)) {
+                return (configurePathUsingVariable(configurablePath, MAIN_ASSEMBLY_DIR_VARIABLE, mainAssemblyDirectoryName));
             }
-            if (configurablePath.Contains("%system32dir%")) {
-                string endOfPath = configurablePath.Replace("%system32dir%", String.Empty);
-                if (!String.IsNullOrEmpty(endOfPath) && endOfPath[0] == Path.DirectorySeparatorChar) {
-                    endOfPath = endOfPath.Substring(1);
-                }
-                if (!String.IsNullOrEmpty(endOfPath)) {
-                    return (Path.Combine(system32DirectoryName, endOfPath));
-                }
-                return (system32DirectoryName);
+            if (configurablePath.Contains(SYSTEM32_DIR_VARIABLE)) {
+                return (configurePathUsingVariable(configurablePath, SYSTEM32_DIR_VARIABLE, system32DirectoryName));
             }
             return (Path.GetFullPath(configurablePath));
         }
 
-        private static Assembly CurrentDomainOnAssemblyResolve(object sender, ResolveEventArgs args) {
+        private static string configurePathUsingVariable(string configurablePath, string variableName, string variableValue) {
+            if (!configurablePath.Contains(variableName)) {
+                return (Path.GetFullPath(configurablePath));
+            }
             //
+            string endOfPath = configurablePath.Replace(variableName, String.Empty);
+            if (!String.IsNullOrEmpty(endOfPath) && endOfPath[0] == Path.DirectorySeparatorChar) {
+                endOfPath = endOfPath.Substring(1);
+            }
+            if (!String.IsNullOrEmpty(endOfPath)) {
+                return (Path.Combine(variableValue, endOfPath));
+            }
+            return (variableValue);
+        }
+
+        /// <summary>
+        /// Heart of this utility. Assembly resolving handler.
+        /// Gives decompressed assembly if required assembly was included into project.
+        /// </summary>
+        private static Assembly CurrentDomainOnAssemblyResolve(object sender, ResolveEventArgs args) {
             try {
                 IncludedAssemblyConfig config;
                 if (assembliesByAliases.TryGetValue(args.Name, out config)) {
@@ -248,7 +283,7 @@ namespace NBox.Loader
                 //
                 return (null);
             } catch (Exception exc) {
-                File.AppendAllText("rolling-error.log", exc.ToString());
+                File.AppendAllText("rolling-error.log", String.Format("Error while loading requested assembly '{0}' : ", args.Name) + exc);
                 //
                 return (null);
             }

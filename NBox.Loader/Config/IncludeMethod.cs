@@ -97,6 +97,10 @@ namespace NBox.Config
             }
         }
 
+        public IncludeMethod(IncludeMethodKind includeMethodKind) {
+            this.includeMethodKind = includeMethodKind;
+        }
+
         public IncludeMethod(IncludeMethodKind includeMethodKind, string fileLoadFromPathOrResourceName) {
             if ((includeMethodKind != IncludeMethodKind.File) && (includeMethodKind != IncludeMethodKind.Resource)) {
                 throw new InvalidOperationException("Invalid include method for this arguments set. Use alternative constructor.");
