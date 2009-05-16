@@ -8,7 +8,8 @@ namespace NBox.Config
     {
         Always = 1,
         CheckExist = 2,
-        CheckSize = 3
+        CheckSize = 3,
+        Never = 4
     }
 
     public sealed class IncludedFileConfig : IncludedObjectConfigBase
@@ -54,11 +55,9 @@ namespace NBox.Config
             extractToPathAttribute.Value = this.extractToPath;
             xmlNode.Attributes.Append(extractToPathAttribute);
 
-            if (this.overwriteOnExtract != OVERWRITE_ON_EXTRACT_DEFAULT) {
-                XmlAttribute overwriteOnExtractAttribute = ownerDocument.CreateAttribute("overwrite-on-extracting");
-                overwriteOnExtractAttribute.Value = Convert.ToString(this.overwriteOnExtract);
-                xmlNode.Attributes.Append(overwriteOnExtractAttribute);
-            }
+            XmlAttribute overwriteOnExtractAttribute = ownerDocument.CreateAttribute("overwrite-on-extracting");
+            overwriteOnExtractAttribute.Value = Convert.ToString(this.overwriteOnExtract);
+            xmlNode.Attributes.Append(overwriteOnExtractAttribute);
         }
 #else
         public override void XmlExport(XmlNode xmlNode) {

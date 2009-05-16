@@ -14,7 +14,7 @@ using NBox.Utils;
 
 namespace NBox
 {
-    class Program
+    internal class Program
     {
         private static readonly ILog logger = LogManager.GetLogger(typeof(Program));
 
@@ -83,8 +83,8 @@ namespace NBox
             }
 
             // Packing the data to the temp directory
-            IList<IncludedObjectConfigBase> includedObjects = new List<IncludedObjectConfigBase>(configuration.IncludedObjects);
-            includedObjects.Add(configuration.MainAssembly);
+            IList<IncludedObjectConfigBase> includedObjects = new List<IncludedObjectConfigBase>(configuration.OutputConfig.IncludedObjects);
+            includedObjects.Add(configuration.OutputConfig.MainAssembly);
             try {
                 foreach (IncludedObjectConfigBase configBase in includedObjects) {
                     string sourceFilePath = configurePathByConfigurationVariables(configBase.Path, configuration);
@@ -107,7 +107,7 @@ namespace NBox
                     long encodedLength;
                     byte[] compressed = LzmaHelper.Encode(configBase.CompressionConfig, bytes, bytes.LongLength, out encodedLength);
                     using (FileStream fileStream = File.OpenWrite(packedFilePath)) {
-                        fileStream.Write(compressed, 0, unchecked((int) encodedLength));
+                        fileStream.Write(compressed, 0, unchecked((int)encodedLength));
                     }
                     //
                     if (logger.IsInfoEnabled) {
@@ -135,7 +135,7 @@ namespace NBox
                         0 != overlaysOrdered.Count ? (overlaysOrdered[overlaysOrdered.Count - 1].IncludeMethod.OverlayOffset + overlaysOrdered[overlaysOrdered.Count - 1].IncludeMethod.OverlayLength)
                             : 0;
                     try {
-                        configBase.IncludeMethod.OverlayLength = unchecked((int) new FileInfo(includedObjectsPackedFiles[configBase]).Length);
+                        configBase.IncludeMethod.OverlayLength = unchecked((int)new FileInfo(includedObjectsPackedFiles[configBase]).Length);
                     } catch (IOException exc) {
                         if (logger.IsErrorEnabled) {
                             logger.Error(String.Format("Error while calculating overlays placement. Message : {0}.", exc.Message), exc);
@@ -167,10 +167,10 @@ namespace NBox
                         }
                         Assembly assembly = Assembly.ReflectionOnlyLoadFrom(configuredAssemblyPath);
 
-                        if (configBase == configuration.MainAssembly) {
+                        if (configBase == configuration.OutputConfig.MainAssembly) {
                             string[] manifestResourceNames = assembly.GetManifestResourceNames();
                             foreach (string resourceName in manifestResourceNames) {
-                                string resourceFilePath = Path.Combine(tempDirectoryName, resourceName.Replace(assembly.GetName().Name, Path.GetFileNameWithoutExtension(configuration.OutputPath)));
+                                string resourceFilePath = Path.Combine(tempDirectoryName, resourceName.Replace(assembly.GetName().Name, Path.GetFileNameWithoutExtension(configuration.OutputConfig.OutputPath)));
                                 //
                                 if (File.Exists(resourceFilePath)) {
                                     throw new InvalidOperationException(String.Format("File for resource with name {0} already exists. May be resources naming conflict ?", resourceName));
@@ -181,7 +181,7 @@ namespace NBox
                                         if (stream == null) {
                                             throw new InvalidOperationException("Cannot read one of manifest resource stream from assembly.");
                                         }
-                                        const int bufferSize = 32*1024;
+                                        const int bufferSize = 32 * 1024;
                                         byte[] buffer = new byte[bufferSize];
                                         int totalBytesReaded = 0;
                                         while (stream.CanRead && (totalBytesReaded < stream.Length)) {
@@ -200,7 +200,7 @@ namespace NBox
                         if (fullName == null) {
                             throw new InvalidOperationException("Cannot resolve full name of assembly.");
                         }
-                        IncludedAssemblyConfig assemblyConfig = ((IncludedAssemblyConfig) configBase);
+                        IncludedAssemblyConfig assemblyConfig = ((IncludedAssemblyConfig)configBase);
                         //
                         if (addStringToTheListIfNotAlready(assemblyConfig.Aliases, fullName)) {
                             if (logger.IsTraceEnabled) {
@@ -208,7 +208,7 @@ namespace NBox
                             }
                         }
                         //
-                        if (assemblyConfig.GeneratePartiallyAliases) {
+                        if (assemblyConfig.GeneratePartialAliases) {
                             string[] fullNameParts = fullName.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                             //
                             string partiallyName = fullNameParts[0];
@@ -263,7 +263,7 @@ namespace NBox
             compilerParameters.ReferencedAssemblies.Add("System.Xml.dll");
             compilerParameters.ReferencedAssemblies.Add("System.Data.dll");
 
-            string outputAssemblyPath = configurePathByConfigurationVariables(configuration.OutputPath, configuration);
+            string outputAssemblyPath = configurePathByConfigurationVariables(configuration.OutputConfig.OutputPath, configuration);
             compilerParameters.OutputAssembly = outputAssemblyPath;
 
             //
@@ -274,33 +274,33 @@ namespace NBox
             }
             compilerParameters.EmbeddedResources.Add(Path.Combine(tempDirectoryName, "attached-configuration.xml"));
             //
-            compilerParameters.CompilerOptions = configuration.OutputAppType == OutputAppType.Console ? "/target:exe" : "/target:winexe";
+            compilerParameters.CompilerOptions = configuration.OutputConfig.OutputAppType == OutputAppType.Console ? "/target:exe" : "/target:winexe";
 
             string platformOption = null;
-            switch (configuration.OutputMachine) {
+            switch (configuration.OutputConfig.OutputMachine) {
                 case OutputMachine.Any: {
-                    platformOption = " /platform:anycpu";
-                    break;
-                }
+                        platformOption = " /platform:anycpu";
+                        break;
+                    }
                 case OutputMachine.x86: {
-                    platformOption = " /platform:x86";
-                    break;
-                }
+                        platformOption = " /platform:x86";
+                        break;
+                    }
                 case OutputMachine.x64: {
-                    platformOption = " /platform:x64";
-                    break;
-                }
+                        platformOption = " /platform:x64";
+                        break;
+                    }
                 case OutputMachine.Itanium: {
-                    platformOption = " /platform:Itanium";
-                    break;
-                }
+                        platformOption = " /platform:Itanium";
+                        break;
+                    }
             }
             compilerParameters.CompilerOptions = compilerParameters.CompilerOptions + " " + platformOption;
 
             compilerParameters.CompilerOptions = compilerParameters.CompilerOptions + " " + "/define:LOADER";
 
-            if (!String.IsNullOrEmpty(configuration.OutputWin32IconPath)) {
-                string win32iconOption = String.Format("/win32icon:\"{0}\"", configurePathByConfigurationVariables(configuration.OutputWin32IconPath, configuration));
+            if (!String.IsNullOrEmpty(configuration.OutputConfig.OutputWin32IconPath)) {
+                string win32iconOption = String.Format("/win32icon:\"{0}\"", configurePathByConfigurationVariables(configuration.OutputConfig.OutputWin32IconPath, configuration));
                 compilerParameters.CompilerOptions = compilerParameters.CompilerOptions + " " + win32iconOption;
             }
 
@@ -325,6 +325,7 @@ namespace NBox
                 @"..\..\..\NBox.Loader\Config\IncludedObjectConfigBase.cs",
                 @"..\..\..\NBox.Loader\Config\IncludeMethod.cs",
                 @"..\..\..\NBox.Loader\Config\ISerializableToXmlNode.cs",
+                @"..\..\..\NBox.Loader\Config\OutputConfig.cs",
                 @"..\..\..\NBox.Loader\Lzma\ICoder.cs",
                 @"..\..\..\NBox.Loader\Lzma\Common\CommandLineParser.cs",
                 @"..\..\..\NBox.Loader\Lzma\Common\CRC.cs",
@@ -409,7 +410,7 @@ namespace NBox
                 }
                 //
                 try {
-                    Int32 outputAssemblySize = unchecked((int) new FileInfo(outputAssemblyPath).Length);
+                    Int32 outputAssemblySize = unchecked((int)new FileInfo(outputAssemblyPath).Length);
                     using (FileStream stream = File.OpenWrite(outputAssemblyPath)) {
                         stream.Seek(0, SeekOrigin.End);
                         //
@@ -419,10 +420,10 @@ namespace NBox
                         }
                         //
                         byte[] initialOffsetStamp = new byte[4];
-                        initialOffsetStamp[3] = (byte) (outputAssemblySize & 0xFF);
-                        initialOffsetStamp[2] = (byte) ((outputAssemblySize >> 8) & 0xFF);
-                        initialOffsetStamp[1] = (byte) ((outputAssemblySize >> 16) & 0xFF);
-                        initialOffsetStamp[0] = (byte) ((outputAssemblySize >> 24) & 0xFF);
+                        initialOffsetStamp[3] = (byte)(outputAssemblySize & 0xFF);
+                        initialOffsetStamp[2] = (byte)((outputAssemblySize >> 8) & 0xFF);
+                        initialOffsetStamp[1] = (byte)((outputAssemblySize >> 16) & 0xFF);
+                        initialOffsetStamp[0] = (byte)((outputAssemblySize >> 24) & 0xFF);
                         //
                         if (logger.IsTraceEnabled) {
                             logger.Trace(String.Format("Writing initial offset stamp : {0} bytes.", outputAssemblySize));
@@ -520,7 +521,7 @@ namespace NBox
             if (logger.IsFatalEnabled) {
                 if (exceptionObject != null) {
                     if (exceptionObject is Exception) {
-                        logger.Fatal("An unhandled exception occured. Program is terminating.", (Exception) exceptionObject);
+                        logger.Fatal("An unhandled exception occured. Program is terminating.", (Exception)exceptionObject);
                     } else {
                         logger.Fatal(String.Format("An unhandled exception occured. Program is terminating. Exception object : {0}", exceptionObject));
                     }
@@ -546,7 +547,7 @@ namespace NBox
                 return (configurePath(configurablePath, "%rootdir%", configuration.Variables.RootDirectory));
             }
             //
-            return (configurablePath);
+            return (Path.GetFullPath(configurablePath));
         }
 
         private static string configurePath(string configurablePath, string variable, string variableName) {

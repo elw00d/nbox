@@ -9,7 +9,7 @@
 
 
 
-Annotations and ArgumentChecker - create Lite version of this classes.
++Annotations and ArgumentChecker - create Lite version of this classes.
 
 Вопрос. Корректно ли обращение с MemoryStream в LzmaHelper ?
 Кем и где будет освобожден буфер этого стрима ?
@@ -52,9 +52,9 @@ Annotations and ArgumentChecker - create Lite version of this classes.
 
 +15. XSD Schema detailed. Add keys and references constraints. 2h / 3h
 
-_16. Compression options real support
+!16. Compression options real support
 
-_17. NAnt build scripts for .NET 2.0 and .NET 3.5
+17. NAnt build scripts for .NET 2.0 and .NET 3.5
 
 18. MONO Testing on Windows
 
@@ -66,19 +66,21 @@ _17. NAnt build scripts for .NET 2.0 and .NET 3.5
 
 22. NAnt task
 
-_23. Refactor code
+23. Refactor code
 
 +24. Test Spring applications
 
-25. Think about resources
+!25. Think about resources
 
-26. Optimize the loader
+?26. Optimize the loader
 
-27. Change XSD:
-   - add overwriting options as xs:simpletype
-   - includes : do separate sections for assemblies and files
++27. Change XSD:
+   + add overwriting options as xs:simpletype
+   + includes : do separate sections for assemblies and files
+   + add default variables to <assemblies and <files
+   - add compiler extended parameters feauture
    
-28. Think about different result assembly name and result file name.
+!28. Think about different result assembly name and result file name.
    - AssemblyInfo grabbing or specifying explicitly.
 
 29. Think about feature to name some files according to entry assembly name,
@@ -92,3 +94,10 @@ _23. Refactor code
   - Windows Forms application with sounds using XM native library
   - WPF application using resources transnaming
   - Spring .NET sample
+
+31. Extensions: add custom event handlers on startup and before exit from application.
+
+32. Delete temp files
+    Set temp directory
+    
++33. Add Never to overwriting options
