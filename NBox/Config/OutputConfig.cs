@@ -1,39 +1,63 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
+using NBox.Utils;
 
 namespace NBox.Config
 {
+    public enum OutputAppType
+    {
+        Console = 1,
+        WinExe = 2
+    }
+
+    public enum OutputMachine
+    {
+        Any = 1,
+        x86 = 2,
+        x64 = 3,
+        Itanium = 4
+    }
+
     public sealed class OutputConfig
     {
-        private readonly OutputAppType outputAppType;
+        private readonly OutputAppType appType;
 
-        public OutputAppType OutputAppType {
+        public OutputAppType AppType {
             get {
-                return (outputAppType);
+                return (this.appType);
             }
         }
 
-        private readonly OutputMachine outputMachine;
+        private readonly OutputMachine machine;
 
-        public OutputMachine OutputMachine {
+        public OutputMachine Machine {
             get {
-                return (outputMachine);
+                return (this.machine);
             }
         }
 
-        private readonly string outputPath;
+        private readonly string path;
 
-        public string OutputPath {
+        public string Path {
             get {
-                return (outputPath);
+                return (this.path);
             }
         }
 
-        private readonly string outputWin32IconPath;
+        private readonly string assemblyName;
 
-        public string OutputWin32IconPath {
+        [CanBeNull]
+        public string AssemblyName {
             get {
-                return (outputWin32IconPath);
+                return (assemblyName);
+            }
+        }
+
+        private readonly string win32IconPath;
+
+        public string Win32IconPath {
+            get {
+                return (this.win32IconPath);
             }
         }
 
@@ -45,11 +69,28 @@ namespace NBox.Config
             }
         }
 
-        private readonly ApartmentState outputApartmentState;
+        private readonly ApartmentState apartmentState;
 
-        public ApartmentState OutputApartmentState {
+        public ApartmentState ApartmentState {
             get {
-                return (outputApartmentState);
+                return (this.apartmentState);
+            }
+        }
+
+        private readonly bool grabResources;
+
+        public bool GrabResources {
+            get {
+                return (grabResources);
+            }
+        }
+
+        private string compilerOptions;
+
+        [CanBeNull]
+        public string CompilerOptions {
+            get {
+                return (compilerOptions);
             }
         }
 
@@ -65,13 +106,29 @@ namespace NBox.Config
             }
         }
 
-        public OutputConfig(OutputAppType outputAppType, OutputMachine outputMachine, string outputPath, string outputWin32IconPath, IncludedAssemblyConfig mainAssembly, ApartmentState outputApartmentState) {
-            this.outputAppType = outputAppType;
-            this.outputMachine = outputMachine;
-            this.outputPath = outputPath;
-            this.outputWin32IconPath = outputWin32IconPath;
+        /// <summary>
+        /// Retrieves all included objects declared in output assembly configuration
+        /// including the main assembly configuration.
+        /// </summary>
+        public IList<IncludedObjectConfigBase> GetAllIncludedObjects() {
+            IList<IncludedObjectConfigBase> res = new List<IncludedObjectConfigBase>(this.includedObjects);
+            res.Add(this.mainAssembly);
+            return (res);
+        }
+
+        public OutputConfig(OutputAppType outputAppType, OutputMachine outputMachine, string outputPath,
+            string assemblyName, string outputWin32IconPath, IncludedAssemblyConfig mainAssembly,
+            ApartmentState outputApartmentState, bool grabResources, string compilerOptions) {
+            //
+            this.appType = outputAppType;
+            this.machine = outputMachine;
+            this.path = outputPath;
+            this.assemblyName = assemblyName;
+            this.win32IconPath = outputWin32IconPath;
             this.mainAssembly = mainAssembly;
-            this.outputApartmentState = outputApartmentState;
+            this.apartmentState = outputApartmentState;
+            this.grabResources = grabResources;
+            this.compilerOptions = compilerOptions;
         }
     }
 }

@@ -175,6 +175,8 @@
                   </xs:sequence>
                 </xs:complexType>
               </xs:element>
+              <!-- Compiler options -->
+              <xs:element name="compiler-options" minOccurs="0" maxOccurs="1" type="xs:string"/>
             </xs:sequence>
             <xs:attribute name="path" type="xs:string" use="required" />
             <xs:attribute name="apptype" use="required">
@@ -206,6 +208,8 @@
             </xs:attribute>
             <xs:attribute name="main-assembly-ref" type="xs:string" use="required" />
             <xs:attribute name="win32icon" type="xs:string" use="optional" />
+            <xs:attribute name="grab-resources" type="xs:boolean" use="optional"/>
+            <xs:attribute name="assembly-name" type="xs:string" use="optional"/>
           </xs:complexType>
 
           <xs:keyref name="main-assembly-ref" refer="own:assembly-id">
