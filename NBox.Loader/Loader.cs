@@ -131,7 +131,7 @@ namespace NBox.Loader
                     // Starting thread with selected ThreadApartment
                     Thread threadWithApartment = new Thread(start);
                     threadWithApartment.IsBackground = false;
-                    threadWithApartment.SetApartmentState(configuration.OutputConfig.OutputApartmentState);
+                    threadWithApartment.SetApartmentState(configuration.OutputConfig.ApartmentState);
                     threadWithApartment.Start(entryPoint);
                     threadWithApartment.Join();
                 }

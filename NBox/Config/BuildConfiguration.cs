@@ -9,20 +9,6 @@ using NBox.Utils;
 
 namespace NBox.Config
 {
-    public enum OutputAppType
-    {
-        Console = 1,
-        WinExe = 2
-    }
-
-    public enum OutputMachine
-    {
-        Any = 1,
-        x86 = 2,
-        x64 = 3,
-        Itanium = 4
-    }
-
     public sealed class BuildConfiguration
     {
         private const string ERROR_ID_ALREADY_EXISTS = "Another instance with same ID exisis already.";
@@ -297,10 +283,13 @@ namespace NBox.Config
             // Parsing output configuration
             ApartmentState outputApartmentState;
             string outputPath;
+            string assemblyName = null;
             OutputAppType outputAppType;
             OutputMachine outputMachine;
             IncludedAssemblyConfig mainAssembly;
+            bool outputGrabResources = false;
             string outputWin32IconPath = null;
+            string compilerOptions = null;
             //
             XmlNode outputNode = document.SelectSingleNode("def:configuration/def:output", namespaceManager);
             if (outputNode == null) {
@@ -309,8 +298,20 @@ namespace NBox.Config
             //
             outputApartmentState = (ApartmentState)Enum.Parse(typeof(ApartmentState), outputNode.Attributes["apartment"].Value, true);
             outputPath = outputNode.Attributes["path"].Value;
+            if (outputNode.Attributes["assembly-name"] != null) {
+                assemblyName = outputNode.Attributes["assembly-name"].Value;
+            }
             outputAppType = (OutputAppType)Enum.Parse(typeof(OutputAppType), outputNode.Attributes["apptype"].Value, true);
             outputMachine = (OutputMachine)Enum.Parse(typeof(OutputMachine), outputNode.Attributes["machine"].Value, true);
+            if (outputNode.Attributes["grab-resources"] != null) {
+                outputGrabResources = bool.Parse(outputNode.Attributes["grab-resources"].Value);
+            }
+            //
+            XmlNode compilerOptionsNode = outputNode.SelectSingleNode("def:compiler-options", namespaceManager);
+            if (compilerOptionsNode != null) {
+                compilerOptions = compilerOptionsNode.InnerText;
+            }
+            //
             mainAssembly = GetAssemblyConfigByID(outputNode.Attributes["main-assembly-ref"].Value);
             if (mainAssembly == null) {
                 throw new InvalidOperationException("Main assembly specified with incorrect ID.");
@@ -321,8 +322,8 @@ namespace NBox.Config
                 outputWin32IconPath = outputWin32IconAttribute.Value;
             }
             //
-            this.outputConfig = new OutputConfig(outputAppType, outputMachine, outputPath,
-                outputWin32IconPath, mainAssembly, outputApartmentState);
+            this.outputConfig = new OutputConfig(outputAppType, outputMachine, outputPath, assemblyName,
+                outputWin32IconPath, mainAssembly, outputApartmentState, outputGrabResources, compilerOptions);
             //
             XmlNodeList includesAssemblyNodes = outputNode.SelectNodes("def:includes/def:assemblies/def:assembly", namespaceManager);
             // ReSharper disable PossibleNullReferenceException
@@ -426,15 +427,15 @@ namespace NBox.Config
             // Output options serialization
             XmlElement outputElement = document.CreateElement("output");
             XmlAttribute outputPathAttribute = document.CreateAttribute("path");
-            outputPathAttribute.Value = this.outputConfig.OutputPath;
+            outputPathAttribute.Value = this.outputConfig.Path;
             outputElement.Attributes.Append(outputPathAttribute);
 
             XmlAttribute outputAppTypeAttribute = document.CreateAttribute("apptype");
-            outputAppTypeAttribute.Value = Convert.ToString(this.outputConfig.OutputAppType);
+            outputAppTypeAttribute.Value = Convert.ToString(this.outputConfig.AppType);
             outputElement.Attributes.Append(outputAppTypeAttribute);
 
             XmlAttribute outputMachineAttribute = document.CreateAttribute("machine");
-            outputMachineAttribute.Value = Convert.ToString(this.outputConfig.OutputMachine);
+            outputMachineAttribute.Value = Convert.ToString(this.outputConfig.Machine);
             outputElement.Attributes.Append(outputMachineAttribute);
 
             XmlAttribute outputMainAssemblyRefAttribute = document.CreateAttribute("main-assembly-ref");
@@ -442,12 +443,12 @@ namespace NBox.Config
             outputElement.Attributes.Append(outputMainAssemblyRefAttribute);
 
             XmlAttribute outputApartmentAttribute = document.CreateAttribute("apartment");
-            outputApartmentAttribute.Value = Convert.ToString(this.outputConfig.OutputApartmentState);
+            outputApartmentAttribute.Value = Convert.ToString(this.outputConfig.ApartmentState);
             outputElement.Attributes.Append(outputApartmentAttribute);
 
-            if (!String.IsNullOrEmpty(this.outputConfig.OutputWin32IconPath)) {
+            if (!String.IsNullOrEmpty(this.outputConfig.Win32IconPath)) {
                 XmlAttribute outputWin32IconAttribute = document.CreateAttribute("win32icon");
-                outputWin32IconAttribute.Value = this.outputConfig.OutputWin32IconPath;
+                outputWin32IconAttribute.Value = this.outputConfig.Win32IconPath;
                 outputElement.Attributes.Append(outputWin32IconAttribute);
             }
 

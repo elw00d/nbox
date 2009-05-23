@@ -70,7 +70,7 @@
 
 +24. Test Spring applications
 
-!25. Think about resources
++25. Think about resources
 
 ?26. Optimize the loader
 
@@ -78,12 +78,12 @@
    + add overwriting options as xs:simpletype
    + includes : do separate sections for assemblies and files
    + add default variables to <assemblies and <files
-   - add compiler extended parameters feauture
+   + add compiler extended parameters feauture
    
-!28. Think about different result assembly name and result file name.
-   - AssemblyInfo grabbing or specifying explicitly.
++28. +Think about different result assembly name and result file name.
+    -AssemblyInfo grabbing or +specifying explicitly.
 
-29. Think about feature to name some files according to entry assembly name,
+?29. Think about feature to name some files according to entry assembly name,
    for example, if archive assembly called Compressed.exe, file App.config
    will be extracted as Compressed.exe.config.
    May be restart application is needed for it.
@@ -97,7 +97,7 @@
 
 31. Extensions: add custom event handlers on startup and before exit from application.
 
-32. Delete temp files
-    Set temp directory
+32. +Delete temp files
+    ?Set temp directory
     
 +33. Add Never to overwriting options

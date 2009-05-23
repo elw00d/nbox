@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Xml;
+using System.Configuration;
 using Common.Logging;
 using ICSharpCode.SharpZipLib.Core;
 using ICSharpCode.SharpZipLib.Zip;
@@ -29,43 +30,31 @@ namespace NBox
             return (true);
         }
 
-        static void _Main(string[] args) {
-            if (args.Length == 0) {
-                printUsage();
-                return;
-            }
-
-            string configFilePath = args[0];
-            if (!File.Exists(args[0])) {
-                if (logger.IsErrorEnabled) {
-                    logger.Error(String.Format("File {0} was not found.", configFilePath));
-                }
-                //
-                printFailureMessage();
-                return;
-            }
-
-            // Reading configuration
-            BuildConfiguration configuration;
+        /// <summary>
+        /// Reads configuration file from specified path.
+        /// </summary>
+        private static BuildConfiguration readBuildConfiguration(string configFilePath) {
             try {
-                configuration = new BuildConfiguration(Path.GetFullPath(Path.GetFullPath(configFilePath)));
+                return (new BuildConfiguration(Path.GetFullPath(Path.GetFullPath(configFilePath))));
             } catch (XmlException exc) {
                 if (logger.IsErrorEnabled) {
                     logger.Error(String.Format("XML configuration is not correct. Message : {0}", exc.Message), exc);
                 }
-                printFailureMessage();
-                return;
+                throw;
             } catch (InvalidOperationException exc) {
                 if (logger.IsErrorEnabled) {
                     logger.Error(String.Format("Error during loading configuration. Message : {0}.", exc.Message), exc);
                 }
-                printFailureMessage();
-                return;
+                throw;
             }
+        }
 
-            Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles = new Dictionary<IncludedObjectConfigBase, string>();
-
-            // Create temp directory for store packed files and generated attached configuration
+        /// <summary>
+        /// Creates temp directory for store packed files and generated attached configuration.
+        /// </summary>
+        /// <param name="configuration"></param>
+        /// <returns>Path to directory created.</returns>
+        private static string createTemporaryDirectory(BuildConfiguration configuration, bool useUserTempDirs) {
             string tempBaseDirectoryName = Path.Combine(configuration.Variables.ConfigFileDirectory, "Temp");
             string tempDirectoryName = Path.Combine(tempBaseDirectoryName, Guid.NewGuid().ToString());
             try {
@@ -74,19 +63,24 @@ namespace NBox
                 }
                 //
                 Directory.CreateDirectory(tempDirectoryName);
+                return (tempDirectoryName);
             } catch (IOException exc) {
                 if (logger.IsErrorEnabled) {
                     logger.Error(String.Format("Cannot create temporary directory. Message : {0}.", exc.Message), exc);
                 }
-                printFailureMessage();
-                return;
+                throw;
             }
+        }
 
+        /// <summary>
+        /// Compress all included objects and store it into temporary directory.
+        /// </summary>
+        /// <returns>Dictionary with packed files locations.</returns>
+        private static Dictionary<IncludedObjectConfigBase, string> packIncludedObjects(BuildConfiguration configuration, string tempDirectoryName) {
+            Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles = new Dictionary<IncludedObjectConfigBase, string>();
             // Packing the data to the temp directory
-            IList<IncludedObjectConfigBase> includedObjects = new List<IncludedObjectConfigBase>(configuration.OutputConfig.IncludedObjects);
-            includedObjects.Add(configuration.OutputConfig.MainAssembly);
             try {
-                foreach (IncludedObjectConfigBase configBase in includedObjects) {
+                foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.GetAllIncludedObjects()) {
                     string sourceFilePath = configurePathByConfigurationVariables(configBase.Path, configuration);
                     //
                     string packedFilePath = Path.Combine(tempDirectoryName, Guid.NewGuid() + ".packed");
@@ -116,17 +110,25 @@ namespace NBox
                     //
                     includedObjectsPackedFiles.Add(configBase, packedFilePath);
                 }
+                //
+                return (includedObjectsPackedFiles);
             } catch (IOException exc) {
                 if (logger.IsErrorEnabled) {
                     logger.Error(String.Format("Error during packing source files. Message : {0}.", exc.Message), exc);
                 }
-                printFailureMessage();
-                return;
+                throw;
             }
+        }
 
+        /// <summary>
+        /// Calculates parameters of overlays storing.
+        /// Offset and length will be written to configuration.
+        /// </summary>
+        /// <returns>Ordered list of overlays configurations.</returns>
+        private static List<IncludedObjectConfigBase> calculateOverlaysAndModifyConfiguration(BuildConfiguration configuration, Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles) {
             // Write actual values of resource names and overlay placement
             List<IncludedObjectConfigBase> overlaysOrdered = new List<IncludedObjectConfigBase>();
-            foreach (IncludedObjectConfigBase configBase in includedObjects) {
+            foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.GetAllIncludedObjects()) {
                 if (configBase.IncludeMethod.IncludeMethodKind == IncludeMethodKind.Resource) {
                     configBase.IncludeMethod.ResourceName = Path.GetFileName(includedObjectsPackedFiles[configBase]);
                     //
@@ -140,25 +142,31 @@ namespace NBox
                         if (logger.IsErrorEnabled) {
                             logger.Error(String.Format("Error while calculating overlays placement. Message : {0}.", exc.Message), exc);
                         }
-                        printFailureMessage();
-                        return;
+                        throw;
                     }
                     //
                     overlaysOrdered.Add(configBase);
                 }
             }
+            return (overlaysOrdered);
+        }
 
-            List<string> resourcesReflectedPaths = new List<string>();
-
+        /// <summary>
+        /// Reflects included assemblies in separate AppDomain.
+        /// Grabs: assembly aliases, standard assembly definition attributes if need,
+        /// resources of main assembly if need.
+        /// </summary>
+        private static void reflectAssembliesAliasesAndGrabResourcesAndAssemblyInfo(BuildConfiguration configuration, string tempDirectoryName, List<string> resourcesReflectedPaths) {
             // Get assemblies full names and put it into aliases
             AppDomain tempAppDomain = null;
+            //
             try {
                 if (logger.IsTraceEnabled) {
                     logger.Trace("Creating temporary AppDomain for resolving assemblies names.");
                 }
                 tempAppDomain = AppDomain.CreateDomain("tempAppDomain");
                 //
-                foreach (IncludedObjectConfigBase configBase in includedObjects) {
+                foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.GetAllIncludedObjects()) {
                     if (configBase is IncludedAssemblyConfig) {
                         string configuredAssemblyPath = configurePathByConfigurationVariables(configBase.Path, configuration);
                         //
@@ -167,10 +175,19 @@ namespace NBox
                         }
                         Assembly assembly = Assembly.ReflectionOnlyLoadFrom(configuredAssemblyPath);
 
-                        if (configBase == configuration.OutputConfig.MainAssembly) {
+                        if ((configBase == configuration.OutputConfig.MainAssembly) && configuration.OutputConfig.GrabResources) {
                             string[] manifestResourceNames = assembly.GetManifestResourceNames();
                             foreach (string resourceName in manifestResourceNames) {
-                                string resourceFilePath = Path.Combine(tempDirectoryName, resourceName.Replace(assembly.GetName().Name, Path.GetFileNameWithoutExtension(configuration.OutputConfig.OutputPath)));
+                                // Change name of resources started with assembly name string
+                                string assemblyName = assembly.GetName().Name;
+                                string modifiedResourceName;
+                                if (resourceName.StartsWith(assemblyName)) {
+                                    modifiedResourceName = getOutputAssemblyName(configuration.OutputConfig) + resourceName.Substring(assemblyName.Length);
+                                } else {
+                                    modifiedResourceName = resourceName;
+                                }
+
+                                string resourceFilePath = Path.Combine(tempDirectoryName, modifiedResourceName);
                                 //
                                 if (File.Exists(resourceFilePath)) {
                                     throw new InvalidOperationException(String.Format("File for resource with name {0} already exists. May be resources naming conflict ?", resourceName));
@@ -223,13 +240,12 @@ namespace NBox
                         }
                     }
                 }
+                //
             } catch (BadImageFormatException exc) {
                 if (logger.IsErrorEnabled) {
                     logger.Error(String.Format("Error while assemblies names resolving. Message : {0}.", exc.Message), exc);
                 }
-                //
-                printFailureMessage();
-                return;
+                throw;
             } finally {
                 if (tempAppDomain != null) {
                     if (logger.IsTraceEnabled) {
@@ -238,8 +254,12 @@ namespace NBox
                     AppDomain.Unload(tempAppDomain);
                 }
             }
+        }
 
-            // Saving configuration
+        /// <summary>
+        /// Stores attached configuration into temporary directory.
+        /// </summary>
+        private static void saveConfiguration(BuildConfiguration configuration, string tempDirectoryName) {
             XmlDocument document = configuration.ExportConfigurationXML();
             try {
                 document.Save(Path.Combine(tempDirectoryName, "attached-configuration.xml"));
@@ -247,11 +267,23 @@ namespace NBox
                 if (logger.IsErrorEnabled) {
                     logger.Error(String.Format("Cannot write attached-configuration.xml file. Message : {0}.", exc.Message), exc);
                 }
-                //
-                printFailureMessage();
-                return;
+                throw;
             }
+        }
 
+        /// <summary>
+        /// Compiles project using configuration and parameters specified.
+        /// </summary>
+        /// <param name="configuration">Configuration of project.</param>
+        /// <param name="tempDirectoryName">Directory for temporary files.</param>
+        /// <param name="includedObjectsPackedFiles">Packed files locations.</param>
+        /// <param name="resourcesReflectedPaths">Resources grabbed from main assembly.</param>
+        /// <param name="assemblyInfoDefinition">AssemblyInfo definition grabbed from main assembly.</param>
+        /// <param name="outputAssemblyPath">Path in temporary directory where build result will be stored.</param>
+        /// <returns></returns>
+        private static CompilerResults compileProject(BuildConfiguration configuration,
+            string tempDirectoryName, Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles,
+            List<string> resourcesReflectedPaths, out string outputAssemblyPath) {
             // Compiling a Loader
 
             IDictionary<string, string> providerOptions = new Dictionary<string, string>();
@@ -263,21 +295,22 @@ namespace NBox
             compilerParameters.ReferencedAssemblies.Add("System.Xml.dll");
             compilerParameters.ReferencedAssemblies.Add("System.Data.dll");
 
-            string outputAssemblyPath = configurePathByConfigurationVariables(configuration.OutputConfig.OutputPath, configuration);
-            compilerParameters.OutputAssembly = outputAssemblyPath;
+            string assemblyFileName = getOutputAssemblyFileName(configuration.OutputConfig);
 
+            outputAssemblyPath = Path.Combine(tempDirectoryName, assemblyFileName);
+            compilerParameters.OutputAssembly = outputAssemblyPath;
             //
-            foreach (IncludedObjectConfigBase configBase in includedObjects) {
+            foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.GetAllIncludedObjects()) {
                 if (configBase.IncludeMethod.IncludeMethodKind == IncludeMethodKind.Resource) {
                     compilerParameters.EmbeddedResources.Add(includedObjectsPackedFiles[configBase]);
                 }
             }
             compilerParameters.EmbeddedResources.Add(Path.Combine(tempDirectoryName, "attached-configuration.xml"));
             //
-            compilerParameters.CompilerOptions = configuration.OutputConfig.OutputAppType == OutputAppType.Console ? "/target:exe" : "/target:winexe";
+            compilerParameters.CompilerOptions = configuration.OutputConfig.AppType == OutputAppType.Console ? "/target:exe" : "/target:winexe";
 
             string platformOption = null;
-            switch (configuration.OutputConfig.OutputMachine) {
+            switch (configuration.OutputConfig.Machine) {
                 case OutputMachine.Any: {
                         platformOption = " /platform:anycpu";
                         break;
@@ -299,13 +332,25 @@ namespace NBox
 
             compilerParameters.CompilerOptions = compilerParameters.CompilerOptions + " " + "/define:LOADER";
 
-            if (!String.IsNullOrEmpty(configuration.OutputConfig.OutputWin32IconPath)) {
-                string win32iconOption = String.Format("/win32icon:\"{0}\"", configurePathByConfigurationVariables(configuration.OutputConfig.OutputWin32IconPath, configuration));
+            if (!String.IsNullOrEmpty(configuration.OutputConfig.CompilerOptions)) {
+                compilerParameters.CompilerOptions = compilerParameters.CompilerOptions + " " + configuration.OutputConfig.CompilerOptions;
+            }
+
+            if (!String.IsNullOrEmpty(configuration.OutputConfig.Win32IconPath)) {
+                string win32iconOption = String.Format("/win32icon:\"{0}\"", configurePathByConfigurationVariables(configuration.OutputConfig.Win32IconPath, configuration));
                 compilerParameters.CompilerOptions = compilerParameters.CompilerOptions + " " + win32iconOption;
             }
 
-            foreach (string resourceReflectedPath in resourcesReflectedPaths) {
-                compilerParameters.EmbeddedResources.Add(resourceReflectedPath);
+            // Add resources reflected from main assembly if need
+            if (configuration.OutputConfig.GrabResources) {
+                foreach (string resourceReflectedPath in resourcesReflectedPaths) {
+                    compilerParameters.EmbeddedResources.Add(resourceReflectedPath);
+                }
+            }
+
+            if (logger.IsInfoEnabled) {
+                logger.Info("Compiler options :");
+                logger.Info(compilerParameters.CompilerOptions);
             }
 
 #if _BUILD_FROM_FILES
@@ -358,8 +403,7 @@ namespace NBox
                         logger.Error(String.Format("Error while writing temporary file {0}.", tempFilePath), exc);
                     }
                     //
-                    printFailureMessage();
-                    return;
+                    throw;
                 }
                 //
                 compilerParameters.EmbeddedResources.Add(tempFilePath);
@@ -367,16 +411,15 @@ namespace NBox
 
             CompilerResults compilerResults = codeProvider.CompileAssemblyFromSource(compilerParameters, sources.ToArray());
 #endif
+            return (compilerResults);
+        }
 
-            if (logger.IsInfoEnabled) {
-                logger.Info("Compiler output :");
-                foreach (string s in compilerResults.Output) {
-                    logger.Info(s);
-                }
-            }
-
+        /// <summary>
+        /// For included objects marked to copy packed content.
+        /// </summary>
+        private static void copyRequiredPackedFiles(BuildConfiguration configuration, Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles) {
             // Copying all required files
-            foreach (IncludedObjectConfigBase configBase in includedObjects) {
+            foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.GetAllIncludedObjects()) {
                 if (!String.IsNullOrEmpty(configBase.CopyCompressedTo)) {
                     string sourceFilePath = includedObjectsPackedFiles[configBase];
                     string destFilePath = configurePathByConfigurationVariables(configBase.CopyCompressedTo, configuration);
@@ -388,22 +431,21 @@ namespace NBox
                             logger.Error(String.Format("Error while copying file {0} to {1}. Message : {2}.", sourceFilePath, destFilePath, exc.Message), exc);
                         }
                         //
-                        printFailureMessage();
-                        return;
+                        throw;
                     }
                 }
             }
+        }
 
-            if (compilerResults.Errors.HasErrors) {
-                if (logger.IsErrorEnabled) {
-                    logger.Error("Errors occured during building project.");
-                }
-                //
-                printFailureMessage();
-                return;
-            }
-
-            // Appending overlays
+        /// <summary>
+        /// Appending overlays.
+        /// </summary>
+        /// <param name="outputAssemblyPath"></param>
+        /// <param name="overlaysOrdered"></param>
+        /// <param name="includedObjectsPackedFiles"></param>
+        private static void appendOverlays(string outputAssemblyPath, List<IncludedObjectConfigBase> overlaysOrdered,
+            Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles) {
+            //
             if (0 != overlaysOrdered.Count) {
                 if (logger.IsTraceEnabled) {
                     logger.Trace("Starting appending overlays.");
@@ -439,8 +481,112 @@ namespace NBox
                     return;
                 }
             }
+        }
+
+        static void _Main(string[] args) {
+            if (args.Length == 0) {
+                printUsage();
+                return;
+            }
+
+            string tempDirectoryName = null;
+
+            try {
+                string configFilePath = args[0];
+                if (!File.Exists(args[0])) {
+                    if (logger.IsErrorEnabled) {
+                        logger.Error(String.Format("File {0} was not found.", configFilePath));
+                    }
+                    //
+                    throw new FileNotFoundException("Configuration file not found.", configFilePath);
+                }
+
+                BuildConfiguration configuration = readBuildConfiguration(configFilePath);
+
+                tempDirectoryName = createTemporaryDirectory(configuration, false);
+
+                Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles = packIncludedObjects(configuration, tempDirectoryName);
+
+                List<IncludedObjectConfigBase> overlaysOrdered = calculateOverlaysAndModifyConfiguration(configuration, includedObjectsPackedFiles);
+
+                List<string> resourcesReflectedPaths = new List<string>();
+                reflectAssembliesAliasesAndGrabResourcesAndAssemblyInfo(configuration, tempDirectoryName, resourcesReflectedPaths);
+
+                saveConfiguration(configuration, tempDirectoryName);
+
+                string outputAssemblyPath;
+                CompilerResults compilerResults = compileProject(configuration, tempDirectoryName,
+                    includedObjectsPackedFiles, resourcesReflectedPaths, out outputAssemblyPath);
+
+                copyRequiredPackedFiles(configuration, includedObjectsPackedFiles);
+
+                if (logger.IsInfoEnabled) {
+                    logger.Info("Compiler output :");
+                    foreach (string s in compilerResults.Output) {
+                        logger.Info(s);
+                    }
+                }
+
+                if (compilerResults.Errors.HasErrors) {
+                    if (logger.IsErrorEnabled) {
+                        logger.Error("Errors occured during building project.");
+                    }
+                    //
+                    throw new InvalidOperationException("Error while building project. View logs for details.");
+                }
+
+                appendOverlays(outputAssemblyPath, overlaysOrdered, includedObjectsPackedFiles);
+
+                // Copy result assembly into output directory
+                string outputFilePath = configurePathByConfigurationVariables(configuration.OutputConfig.Path, configuration);
+
+                try {
+                    if (logger.IsInfoEnabled) {
+                        logger.Info(String.Format("Copying the result file into {0}.", outputFilePath));
+                    }
+                    //
+                    File.Copy(outputAssemblyPath, outputFilePath, true);
+                    if (logger.IsInfoEnabled) {
+                        logger.Info("Copied OK.");
+                    }
+                } catch (IOException exc) {
+                    if (logger.IsErrorEnabled) {
+                        logger.Error(String.Format("Error while copying the result file. Message : {0}.", exc.Message), exc);
+                    }
+                    //
+                    throw;
+                }
+            } catch (Exception exc) {
+                if (logger.IsErrorEnabled) {
+                    string errorString = String.Format("Error while building project. Exception : {0}.", exc);
+                    logger.Error(errorString);
+                    Console.WriteLine(errorString);
+                }
+                //
+                printFailureMessage();
+                return;
+            } finally {
+                try {
+                    if (tempDirectoryName != null) {
+                        clearTemporaryDirectory(tempDirectoryName);
+                    }
+                } catch {
+                    Console.WriteLine("Error temp directory cleanup. View logs for details.");
+                }
+            }
 
             printSuccessMessage();
+        }
+
+        private static void clearTemporaryDirectory(string tempDirectoryName) {
+            try {
+                Directory.Delete(tempDirectoryName, true);
+            } catch (IOException exc) {
+                if (logger.IsErrorEnabled) {
+                    logger.Error(String.Format("Cannot delete temp directory. Message : {0}.", exc.Message), exc);
+                }
+                throw;
+            }
         }
 
         private struct EmbeddedResourceInfo
@@ -485,6 +631,18 @@ namespace NBox
             }
         }
 
+        private static string getOutputAssemblyName(OutputConfig outputConfig) {
+            if (outputConfig.AssemblyName != null) {
+                return (outputConfig.AssemblyName);
+            } else {
+                return (Path.GetFileNameWithoutExtension(outputConfig.Path));
+            }
+        }
+
+        private static string getOutputAssemblyFileName(OutputConfig outputConfig) {
+            return (getOutputAssemblyName(outputConfig) + ".exe");
+        }
+
         private static void printSuccessMessage() {
             Console.WriteLine("BUILD SUCCEEDED.");
             Console.WriteLine();
@@ -496,7 +654,7 @@ namespace NBox
         }
 
         private static void printUsage() {
-            Console.WriteLine("NBox 0.1 (c) 2009, Elw00d");
+            Console.WriteLine("NBox 0.11 (c) 2009, Elw00d");
             Console.WriteLine("Usage : NBox.exe <config-file>");
             Console.WriteLine();
             Console.WriteLine("<config-file> - path to XML configuration file (see samples and schemas)");
