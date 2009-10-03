@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<configuration xmlns="http://www.elwood.su/projects/nbox/schemas/config-file/v1.0">
+  <compression-options-set>
+    <compression-option id="defaultCompression">
+      <level value="ultra"/>
+    </compression-option>
+  </compression-options-set>
+
+  <assemblies default-compression-ref="defaultCompression"
+              default-include-method="Resource"
+              default-generate-partial-aliases="true"
+              default-lazy-load="false">
+
+    <assembly id="ExampleWPF_1.exe" path="%configdir%/src/ExampleWPF_1.exe"/>
+  </assemblies>
+
+    <files default-include-method="Resource"
+           default-compression-ref="defaultCompression"
+           default-overwrite-on-extracting="CheckExist">
+    </files>
+
+  <output path="%configdir%/out/ExampleWPF_1.exe" assembly-name="ExampleWPF_1Boxed" grab-resources="false"
+          apptype="WinExe" apartment="STA" machine="x86" main-assembly-ref="ExampleWPF_1.exe"
+          >
+    <includes>
+      <assemblies>
+        
+      </assemblies>
+      <files>
+        
+      </files>
+    </includes>
+    <compiler-options>/filealign:512 D:\all\Projects\NBox\trunk\NBox.Loader\Properties\AssemblyInfo.cs</compiler-options>
+  </output>
+</configuration>
