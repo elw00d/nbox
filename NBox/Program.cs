@@ -287,7 +287,7 @@ namespace NBox
             // Compiling a Loader
 
             IDictionary<string, string> providerOptions = new Dictionary<string, string>();
-            //providerOptions.Add("CompilerVersion", "v3.5");
+            providerOptions.Add("CompilerVersion", "v3.5");
 
             CSharpCodeProvider codeProvider = new CSharpCodeProvider(providerOptions);
             CompilerParameters compilerParameters = new CompilerParameters();

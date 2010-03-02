@@ -75,36 +75,68 @@ namespace NBox.Loader
             AppDomain.CurrentDomain.AssemblyResolve += CurrentDomainOnAssemblyResolve;
             //
             try {
-                // Initial extracting files
-                foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.IncludedObjects) {
-                    if (configBase is IncludedFileConfig) {
-                        IncludedFileConfig fileConfig = configBase as IncludedFileConfig;
-                        string configuredExtractingPath = configurePath(fileConfig.ExtractToPath);
-                        //
-                        long decodedDataLength = 0;
-                        byte[] bytes = null;
-                        //
-                        bool extracting = true;
-                        if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckExist) {
-                            extracting = !File.Exists(configuredExtractingPath);
-                        } else if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckSize) {
-                            bytes = loadRawData(fileConfig, out decodedDataLength);
-                            extracting = !File.Exists(configuredExtractingPath) || new FileInfo(configuredExtractingPath).Length != bytes.Length;
-                        } else if (fileConfig.OverwriteOnExtract == OverwritingOptions.Never) {
-                            extracting = false;
-                        }
-                        //
-                        if (extracting) {
-                            if (bytes == null) {
+
+                //File.AppendAllText("appdomain name.log", AppDomain.CurrentDomain.FriendlyName);
+                if (!AppDomain.CurrentDomain.FriendlyName.StartsWith("NBOX_FORKED_"))
+                {
+
+                    //File.AppendAllText("appdomain name.log", "Extracting files.. \r\n");
+
+                    // Initial extracting files
+                    foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.IncludedObjects)
+                    {
+                        if (configBase is IncludedFileConfig)
+                        {
+                            IncludedFileConfig fileConfig = configBase as IncludedFileConfig;
+                            string configuredExtractingPath = configurePath(fileConfig.ExtractToPath);
+                            //
+                            long decodedDataLength = 0;
+                            byte[] bytes = null;
+                            //
+                            bool extracting = true;
+                            if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckExist)
+                            {
+                                extracting = !File.Exists(configuredExtractingPath);
+                            }
+                            else if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckSize)
+                            {
                                 bytes = loadRawData(fileConfig, out decodedDataLength);
+                                extracting = !File.Exists(configuredExtractingPath) || new FileInfo(configuredExtractingPath).Length != bytes.Length;
+                            }
+                            else if (fileConfig.OverwriteOnExtract == OverwritingOptions.Never)
+                            {
+                                extracting = false;
                             }
                             //
-                            using (FileStream stream = File.Create(configuredExtractingPath)) {
-                                stream.Write(bytes, 0, unchecked((int) decodedDataLength));
+                            if (extracting)
+                            {
+                                if (bytes == null)
+                                {
+                                    bytes = loadRawData(fileConfig, out decodedDataLength);
+                                }
+                                //
+                                using (FileStream stream = File.Create(configuredExtractingPath))
+                                {
+                                    stream.Write(bytes, 0, unchecked((int)decodedDataLength));
+                                }
                             }
                         }
                     }
+
+                    AppDomainSetup setupInfo = new AppDomainSetup();
+                    string entryAssemblyPath = Assembly.GetEntryAssembly().Location;
+                    string entryAssemblyDir = Path.GetDirectoryName(entryAssemblyPath);
+                    setupInfo.ApplicationBase = Path.GetDirectoryName(entryAssemblyPath);
+                    setupInfo.ConfigurationFile = Path.Combine(entryAssemblyDir, Path.GetFileName(entryAssemblyPath) + ".config");
+
+                    AppDomain forkedDomain = AppDomain.CreateDomain("NBOX_FORKED_" + Guid.NewGuid().ToString(), null, setupInfo);
+                    forkedDomain.ExecuteAssembly(Assembly.GetEntryAssembly().Location);
+                    AppDomain.Unload(forkedDomain);
+
+                    return 0;
                 }
+                
+
                 // Initial loading assemblies with lazy-load = false attribute
                 foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.IncludedObjects) {
                     if (configBase is IncludedAssemblyConfig) {
