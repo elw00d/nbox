@@ -102,4 +102,6 @@
     
 +33. Add Never to overwriting options
 
-34 !!! Add minimum compiler version requirement to config. For example , "3.5"
++ 34 !!! Add minimum compiler version requirement to config. For example , "3.5"
+
++ 35. Add config file specifying feature. And shadow copying of config files with caching in the temp directories.
