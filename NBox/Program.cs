@@ -5,7 +5,6 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Xml;
-using System.Configuration;
 using Common.Logging;
 using ICSharpCode.SharpZipLib.Core;
 using ICSharpCode.SharpZipLib.Zip;
@@ -15,7 +14,7 @@ using NBox.Utils;
 
 namespace NBox
 {
-    internal class Program
+    internal sealed class Program
     {
         private static readonly ILog logger = LogManager.GetLogger(typeof(Program));
 
@@ -54,7 +53,7 @@ namespace NBox
         /// </summary>
         /// <param name="configuration"></param>
         /// <returns>Path to directory created.</returns>
-        private static string createTemporaryDirectory(BuildConfiguration configuration, bool useUserTempDirs) {
+        private static string createTemporaryDirectory(BuildConfiguration configuration) {
             string tempBaseDirectoryName = Path.Combine(configuration.Variables.ConfigFileDirectory, "Temp");
             string tempDirectoryName = Path.Combine(tempBaseDirectoryName, Guid.NewGuid().ToString());
             try {
@@ -278,16 +277,39 @@ namespace NBox
         /// <param name="tempDirectoryName">Directory for temporary files.</param>
         /// <param name="includedObjectsPackedFiles">Packed files locations.</param>
         /// <param name="resourcesReflectedPaths">Resources grabbed from main assembly.</param>
-        /// <param name="assemblyInfoDefinition">AssemblyInfo definition grabbed from main assembly.</param>
         /// <param name="outputAssemblyPath">Path in temporary directory where build result will be stored.</param>
         /// <returns></returns>
         private static CompilerResults compileProject(BuildConfiguration configuration,
             string tempDirectoryName, Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles,
-            List<string> resourcesReflectedPaths, out string outputAssemblyPath) {
+            IEnumerable<string> resourcesReflectedPaths, out string outputAssemblyPath) {
             // Compiling a Loader
 
             IDictionary<string, string> providerOptions = new Dictionary<string, string>();
-            providerOptions.Add("CompilerVersion", "v3.5");
+
+            switch (configuration.OutputConfig.CompilerVersionRequired)
+            {
+                    case CompilerVersionRequired.v2_0:
+                    {
+                        providerOptions.Add("CompilerVersion", "v2.0");
+                        break;
+                    }
+                    case CompilerVersionRequired.v3_0:
+                    {
+                        providerOptions.Add("CompilerVersion", "v3.0");
+                        break;
+                    }
+                    case CompilerVersionRequired.v3_5:
+                    {
+                        providerOptions.Add("CompilerVersion", "v3.5");
+                        break;
+                    }
+                    case CompilerVersionRequired.v4_0:
+                    {
+                        providerOptions.Add("CompilerVersion", "v4.0");
+                        break;
+                    }
+            }
+            
 
             CSharpCodeProvider codeProvider = new CSharpCodeProvider(providerOptions);
             CompilerParameters compilerParameters = new CompilerParameters();
@@ -337,8 +359,8 @@ namespace NBox
             }
 
             if (!String.IsNullOrEmpty(configuration.OutputConfig.Win32IconPath)) {
-                string win32iconOption = String.Format("/win32icon:\"{0}\"", configurePathByConfigurationVariables(configuration.OutputConfig.Win32IconPath, configuration));
-                compilerParameters.CompilerOptions = compilerParameters.CompilerOptions + " " + win32iconOption;
+                string win32IconOption = String.Format("/win32icon:\"{0}\"", configurePathByConfigurationVariables(configuration.OutputConfig.Win32IconPath, configuration));
+                compilerParameters.CompilerOptions = compilerParameters.CompilerOptions + " " + win32IconOption;
             }
 
             // Add resources reflected from main assembly if need
@@ -503,7 +525,7 @@ namespace NBox
 
                 BuildConfiguration configuration = readBuildConfiguration(configFilePath);
 
-                tempDirectoryName = createTemporaryDirectory(configuration, false);
+                tempDirectoryName = createTemporaryDirectory(configuration);
 
                 Dictionary<IncludedObjectConfigBase, string> includedObjectsPackedFiles = packIncludedObjects(configuration, tempDirectoryName);
 
@@ -591,8 +613,12 @@ namespace NBox
 
         private struct EmbeddedResourceInfo
         {
+// ReSharper disable UnaccessedField.Local
+// ReSharper disable MemberCanBePrivate.Local
             public readonly byte[] Data;
             public readonly string ZipEntryName;
+// ReSharper restore MemberCanBePrivate.Local
+// ReSharper restore UnaccessedField.Local
 
             public EmbeddedResourceInfo(byte[] data, string zipEntryName) {
                 this.Data = data;
@@ -603,7 +629,9 @@ namespace NBox
         static readonly List<string> sources = new List<string>();
         static readonly List<EmbeddedResourceInfo> embeddedResources = new List<EmbeddedResourceInfo>();
 
+// ReSharper disable UnusedMember.Local
         private static void loadLoaderSourcesFromZip() {
+// ReSharper restore UnusedMember.Local
             Assembly executingAssembly = Assembly.GetExecutingAssembly();
             Stream zipSourcesStream = executingAssembly.GetManifestResourceStream(executingAssembly.GetName().Name + ".NBox.Loader.zip");
             if (zipSourcesStream == null) {

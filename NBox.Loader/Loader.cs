@@ -71,16 +71,31 @@ namespace NBox.Loader
             }
         }
 
+        private static string getMd5Hash(string input)
+        {
+            System.Security.Cryptography.MD5CryptoServiceProvider x = new System.Security.Cryptography.MD5CryptoServiceProvider();
+            byte[] bs = System.Text.Encoding.UTF8.GetBytes(input);
+            bs = x.ComputeHash(bs);
+            System.Text.StringBuilder s = new System.Text.StringBuilder();
+            foreach (byte b in bs)
+            {
+                s.Append(b.ToString("x2").ToLower());
+            }
+            string password = s.ToString();
+            return password;
+        }
+
         private static int Main(string[] args) {
             AppDomain.CurrentDomain.AssemblyResolve += CurrentDomainOnAssemblyResolve;
             //
             try {
 
-                //File.AppendAllText("appdomain name.log", AppDomain.CurrentDomain.FriendlyName);
-                if (!AppDomain.CurrentDomain.FriendlyName.StartsWith("NBOX_FORKED_"))
+                const string nboxForkedPrefix = "__NBox_Forked_";
+                if (!AppDomain.CurrentDomain.FriendlyName.StartsWith(nboxForkedPrefix))
                 {
 
-                    //File.AppendAllText("appdomain name.log", "Extracting files.. \r\n");
+                    string appConfigFileId = configuration.OutputConfig.AppConfigFileID;
+                    string configFilePath = null;
 
                     // Initial extracting files
                     foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.IncludedObjects)
@@ -88,52 +103,90 @@ namespace NBox.Loader
                         if (configBase is IncludedFileConfig)
                         {
                             IncludedFileConfig fileConfig = configBase as IncludedFileConfig;
-                            string configuredExtractingPath = configurePath(fileConfig.ExtractToPath);
-                            //
-                            long decodedDataLength = 0;
-                            byte[] bytes = null;
-                            //
-                            bool extracting = true;
-                            if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckExist)
+
+                            if (fileConfig.ID != appConfigFileId)
                             {
-                                extracting = !File.Exists(configuredExtractingPath);
-                            }
-                            else if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckSize)
-                            {
-                                bytes = loadRawData(fileConfig, out decodedDataLength);
-                                extracting = !File.Exists(configuredExtractingPath) || new FileInfo(configuredExtractingPath).Length != bytes.Length;
-                            }
-                            else if (fileConfig.OverwriteOnExtract == OverwritingOptions.Never)
-                            {
-                                extracting = false;
-                            }
-                            //
-                            if (extracting)
-                            {
-                                if (bytes == null)
+
+                                string configuredExtractingPath = configurePath(fileConfig.ExtractToPath);
+                                //
+                                long decodedDataLength = 0;
+                                byte[] bytes = null;
+                                //
+                                bool extracting = true;
+                                if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckExist)
+                                {
+                                    extracting = !File.Exists(configuredExtractingPath);
+                                }
+                                else if (fileConfig.OverwriteOnExtract == OverwritingOptions.CheckSize)
                                 {
                                     bytes = loadRawData(fileConfig, out decodedDataLength);
+                                    extracting = !File.Exists(configuredExtractingPath) ||
+                                                 new FileInfo(configuredExtractingPath).Length != bytes.Length;
+                                }
+                                else if (fileConfig.OverwriteOnExtract == OverwritingOptions.Never)
+                                {
+                                    extracting = false;
                                 }
                                 //
-                                using (FileStream stream = File.Create(configuredExtractingPath))
+                                if (extracting)
                                 {
-                                    stream.Write(bytes, 0, unchecked((int)decodedDataLength));
+                                    if (bytes == null)
+                                    {
+                                        bytes = loadRawData(fileConfig, out decodedDataLength);
+                                    }
+                                    //
+                                    using (FileStream stream = File.Create(configuredExtractingPath))
+                                    {
+                                        stream.Write(bytes, 0, unchecked((int) decodedDataLength));
+                                    }
                                 }
+                            } else
+                            {
+                                // It is the App.config file
+
+                                if (configuration.OutputConfig.UseShadowCopying)
+                                {
+                                    string hashedCurrentExeLocation = getMd5Hash(Assembly.GetEntryAssembly().Location);
+                                    string tempDir = Path.GetTempPath();
+                                    configFilePath = Path.Combine(tempDir, hashedCurrentExeLocation + ".config");
+                                } else
+                                {
+                                    string entryAssemblyLocation = Assembly.GetEntryAssembly().Location;
+                                    configFilePath = Path.Combine(Path.GetDirectoryName(entryAssemblyLocation), Path.GetFileName(entryAssemblyLocation) + ".config");
+                                }
+
+                                if (!File.Exists(configFilePath))
+                                {
+                                    long decodedDataLength;
+                                    byte[] bytes;
+
+                                    bytes = loadRawData(fileConfig, out decodedDataLength);
+
+                                    using (FileStream stream = File.Create(configFilePath))
+                                    {
+                                        stream.Write(bytes, 0, unchecked((int)decodedDataLength));
+                                    }
+                                }
+
+
                             }
                         }
                     }
 
-                    AppDomainSetup setupInfo = new AppDomainSetup();
-                    string entryAssemblyPath = Assembly.GetEntryAssembly().Location;
-                    string entryAssemblyDir = Path.GetDirectoryName(entryAssemblyPath);
-                    setupInfo.ApplicationBase = Path.GetDirectoryName(entryAssemblyPath);
-                    setupInfo.ConfigurationFile = Path.Combine(entryAssemblyDir, Path.GetFileName(entryAssemblyPath) + ".config");
+                    if (null != appConfigFileId)
+                    {
+                        AppDomainSetup setupInfo = new AppDomainSetup();
+                        string entryAssemblyPath = Assembly.GetEntryAssembly().Location;
+                        setupInfo.ApplicationBase = Path.GetDirectoryName(entryAssemblyPath);
+                        setupInfo.ConfigurationFile = configFilePath;
 
-                    AppDomain forkedDomain = AppDomain.CreateDomain("NBOX_FORKED_" + Guid.NewGuid().ToString(), null, setupInfo);
-                    forkedDomain.ExecuteAssembly(Assembly.GetEntryAssembly().Location);
-                    AppDomain.Unload(forkedDomain);
+                        AppDomain forkedDomain = AppDomain.CreateDomain(nboxForkedPrefix + Guid.NewGuid(),
+                                                                        null, setupInfo);
+                        forkedDomain.ExecuteAssembly(Assembly.GetEntryAssembly().Location);
+                        AppDomain.Unload(forkedDomain);
 
-                    return 0;
+                        return 0;
+                    }
                 }
                 
 

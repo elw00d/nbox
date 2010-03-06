@@ -18,6 +18,14 @@ namespace NBox.Config
         Itanium = 4
     }
 
+    public enum CompilerVersionRequired
+    {
+        v2_0,
+        v3_0,
+        v3_5,
+        v4_0
+    }
+
     public sealed class OutputConfig
     {
         private readonly OutputAppType appType;
@@ -85,12 +93,25 @@ namespace NBox.Config
             }
         }
 
-        private string compilerOptions;
+        private readonly string compilerOptions;
 
         [CanBeNull]
         public string CompilerOptions {
             get {
                 return (compilerOptions);
+            }
+        }
+
+        private readonly CompilerVersionRequired compilerVersionRequired;
+
+        /// <summary>
+        /// By default set to v2_0.
+        /// </summary>
+        public CompilerVersionRequired CompilerVersionRequired
+        {
+            get
+            {
+                return compilerVersionRequired;
             }
         }
 
@@ -106,6 +127,27 @@ namespace NBox.Config
             }
         }
 
+        private readonly string appConfigFileId;
+
+        [CanBeNull]
+        public string AppConfigFileID
+        {
+            get
+            {
+                return appConfigFileId;
+            }
+        }
+
+        private readonly bool useShadowCopying;
+
+        public bool UseShadowCopying
+        {
+            get
+            {
+                return useShadowCopying;
+            }
+        }
+
         /// <summary>
         /// Retrieves all included objects declared in output assembly configuration
         /// including the main assembly configuration.
@@ -118,7 +160,10 @@ namespace NBox.Config
 
         public OutputConfig(OutputAppType outputAppType, OutputMachine outputMachine, string outputPath,
             string assemblyName, string outputWin32IconPath, IncludedAssemblyConfig mainAssembly,
-            ApartmentState outputApartmentState, bool grabResources, string compilerOptions) {
+            ApartmentState outputApartmentState, bool grabResources, string compilerOptions,
+            CompilerVersionRequired compilerVersionRequired,
+            string appConfigFileId, bool useShadowCopying)
+        {
             //
             this.appType = outputAppType;
             this.machine = outputMachine;
@@ -129,6 +174,9 @@ namespace NBox.Config
             this.apartmentState = outputApartmentState;
             this.grabResources = grabResources;
             this.compilerOptions = compilerOptions;
+            this.compilerVersionRequired = compilerVersionRequired;
+            this.appConfigFileId = appConfigFileId;
+            this.useShadowCopying = useShadowCopying;
         }
     }
 }

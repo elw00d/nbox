@@ -99,11 +99,11 @@ namespace NBox.Config
 
         private readonly bool defaultLazyLoadForAssemblies = true;
 
-        private string defaultCompressionConfigRefForFiles = null;
+        private readonly string defaultCompressionConfigRefForFiles = null;
 
-        private IncludeMethodKind defaultIncludeMethodKindForFiles = IncludeMethodKind.Overlay;
+        private readonly IncludeMethodKind defaultIncludeMethodKindForFiles = IncludeMethodKind.Overlay;
 
-        private OverwritingOptions defaultOverwritingOptionsForFiles = OverwritingOptions.Always;
+        private readonly OverwritingOptions defaultOverwritingOptionsForFiles = OverwritingOptions.Always;
 
         public BuildConfiguration(XmlDocument document, BuildConfigurationVariables variables) {
             ArgumentChecker.NotNull(document, "document");
@@ -290,6 +290,10 @@ namespace NBox.Config
             bool outputGrabResources = false;
             string outputWin32IconPath = null;
             string compilerOptions = null;
+            CompilerVersionRequired compilerVersionRequired = CompilerVersionRequired.v2_0;
+            string appConfigFileId = null;
+            bool useShadowCopying = false;
+
             //
             XmlNode outputNode = document.SelectSingleNode("def:configuration/def:output", namespaceManager);
             if (outputNode == null) {
@@ -307,10 +311,44 @@ namespace NBox.Config
                 outputGrabResources = bool.Parse(outputNode.Attributes["grab-resources"].Value);
             }
             //
-            XmlNode compilerOptionsNode = outputNode.SelectSingleNode("def:compiler-options", namespaceManager);
+            XmlNode compilerOptionsNode = outputNode.SelectSingleNode("def:compiler-options/def:options", namespaceManager);
             if (compilerOptionsNode != null) {
                 compilerOptions = compilerOptionsNode.InnerText;
             }
+
+            XmlNode compilerVersionRequiredNode = outputNode.SelectSingleNode("def:compiler-options", namespaceManager);
+            if (null != compilerVersionRequiredNode)
+            {
+                XmlAttribute compilerVerRequiredAttr = compilerVersionRequiredNode.Attributes["version-required"];
+                if (null != compilerVerRequiredAttr)
+                {
+                    string compilerVerRaw = compilerVerRequiredAttr.Value;
+                    switch (compilerVerRaw)
+                    {
+                        case "v2.0":
+                            {
+                                compilerVersionRequired = CompilerVersionRequired.v2_0;
+                                break;
+                            }
+                        case "v3.0":
+                            {
+                                compilerVersionRequired = CompilerVersionRequired.v3_0;
+                                break;
+                            }
+                        case "v3.5":
+                            {
+                                compilerVersionRequired = CompilerVersionRequired.v3_5;
+                                break;
+                            }
+                        case "v4.0":
+                            {
+                                compilerVersionRequired = CompilerVersionRequired.v4_0;
+                                break;
+                            }
+                    }
+                }
+            }
+
             //
             mainAssembly = GetAssemblyConfigByID(outputNode.Attributes["main-assembly-ref"].Value);
             if (mainAssembly == null) {
@@ -322,8 +360,26 @@ namespace NBox.Config
                 outputWin32IconPath = outputWin32IconAttribute.Value;
             }
             //
+
+            XmlNode appConfigNode = outputNode.SelectSingleNode("def:includes/def:files/def:app-config", namespaceManager);
+            if (null != appConfigNode)
+            {
+                XmlAttribute appConfigFileIdAttribute = appConfigNode.Attributes["ref"];
+                if (null == appConfigFileIdAttribute)
+                {
+                    throw new InvalidOperationException("Required attribute ref not specidied for app-config.");
+                }
+                appConfigFileId = appConfigFileIdAttribute.Value;
+                XmlAttribute useShahowCopyingAttribute = appConfigNode.Attributes["use-shadow-copying"];
+                if (null != useShahowCopyingAttribute)
+                {
+                    useShadowCopying = bool.Parse(useShahowCopyingAttribute.Value);
+                }
+            }
+
             this.outputConfig = new OutputConfig(outputAppType, outputMachine, outputPath, assemblyName,
-                outputWin32IconPath, mainAssembly, outputApartmentState, outputGrabResources, compilerOptions);
+                outputWin32IconPath, mainAssembly, outputApartmentState, outputGrabResources,
+                compilerOptions, compilerVersionRequired, appConfigFileId, useShadowCopying);
             //
             XmlNodeList includesAssemblyNodes = outputNode.SelectNodes("def:includes/def:assemblies/def:assembly", namespaceManager);
             // ReSharper disable PossibleNullReferenceException
@@ -340,13 +396,27 @@ namespace NBox.Config
             // ReSharper disable PossibleNullReferenceException
             foreach (XmlNode includesFileNode in includesFileNodes) {
                 // ReSharper restore PossibleNullReferenceException
-                IncludedFileConfig fileConfigByRef = GetFileConfigByID(includesFileNode.Attributes["ref"].Value);
-                if (fileConfigByRef == null) {
-                    throw new InvalidOperationException(String.Format("Cannot find file to include by ID='{0}'.", includesFileNode.Attributes["ref"]));
+                string id = includesFileNode.Attributes["ref"].Value;
+
+                // Avoid duplicating the app.config file.
+                if (null == appConfigFileId || appConfigFileId != id)
+                {
+                    IncludedFileConfig fileConfigByRef = GetFileConfigByID(id);
+                    if (fileConfigByRef == null)
+                    {
+                        throw new InvalidOperationException(String.Format("Cannot find file to include by ID='{0}'.",
+                                                                          includesFileNode.Attributes["ref"]));
+                    }
+                    outputConfig.IncludedObjects.Add(fileConfigByRef);
                 }
-                outputConfig.IncludedObjects.Add(fileConfigByRef);
             }
             //
+
+            if (null != appConfigFileId)
+            {
+                outputConfig.IncludedObjects.Add(GetFileConfigByID(appConfigFileId));
+            }
+
         }
 
         private static void schemaValidationEventHandler(object sender, ValidationEventArgs args) {
@@ -446,17 +516,34 @@ namespace NBox.Config
             outputApartmentAttribute.Value = Convert.ToString(this.outputConfig.ApartmentState);
             outputElement.Attributes.Append(outputApartmentAttribute);
 
-            if (!String.IsNullOrEmpty(this.outputConfig.Win32IconPath)) {
-                XmlAttribute outputWin32IconAttribute = document.CreateAttribute("win32icon");
-                outputWin32IconAttribute.Value = this.outputConfig.Win32IconPath;
-                outputElement.Attributes.Append(outputWin32IconAttribute);
-            }
+            //if (!String.IsNullOrEmpty(this.outputConfig.Win32IconPath)) {
+            //    XmlAttribute outputWin32IconAttribute = document.CreateAttribute("win32icon");
+            //    outputWin32IconAttribute.Value = this.outputConfig.Win32IconPath;
+            //    outputElement.Attributes.Append(outputWin32IconAttribute);
+            //}
 
             XmlElement includesElement = document.CreateElement("includes");
 
             XmlElement includesAssembliesElement = document.CreateElement("assemblies");
             XmlElement includesFilesElement = document.CreateElement("files");
             //
+
+            if (!string.IsNullOrEmpty(outputConfig.AppConfigFileID))
+            {
+                XmlElement appConfigElement = document.CreateElement("app-config");
+                XmlAttribute appConfigFileIdAttribute = document.CreateAttribute("ref");
+                appConfigFileIdAttribute.Value = outputConfig.AppConfigFileID;
+                appConfigElement.Attributes.Append(appConfigFileIdAttribute);
+
+                if (false != outputConfig.UseShadowCopying )
+                {
+                    XmlAttribute useShadowCopyAttribute = document.CreateAttribute("use-shadow-copying");
+                    useShadowCopyAttribute.Value = outputConfig.UseShadowCopying.ToString().ToLower();
+                    appConfigElement.Attributes.Append(useShadowCopyAttribute);
+                }
+                includesFilesElement.AppendChild(appConfigElement);
+            }
+
             foreach (IncludedObjectConfigBase configBase in outputConfig.IncludedObjects) {
                 // will create element with name "assembly" or "file"
                 XmlElement includedObjectElement = document.CreateElement(configBase.GetXmlNodeDefaultName());
