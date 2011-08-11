@@ -9,6 +9,8 @@ using Common.Logging;
 using ICSharpCode.SharpZipLib.Core;
 using ICSharpCode.SharpZipLib.Zip;
 using Microsoft.CSharp;
+using Mono.Cecil;
+using Mono.Collections.Generic;
 using NBox.Config;
 using NBox.Utils;
 
@@ -151,106 +153,89 @@ namespace NBox
         }
 
         /// <summary>
-        /// Reflects included assemblies in separate AppDomain.
-        /// Grabs: assembly aliases, standard assembly definition attributes if need,
-        /// resources of main assembly if need.
+        /// Reflects included assemblies using Mono.Cecil.
+        /// Grabs: assembly aliases, standard assembly definition attributes if need, resources of main assembly if need.
         /// </summary>
         private static void reflectAssembliesAliasesAndGrabResourcesAndAssemblyInfo(BuildConfiguration configuration, string tempDirectoryName, List<string> resourcesReflectedPaths) {
-            // Get assemblies full names and put it into aliases
-            AppDomain tempAppDomain = null;
             //
-            try {
-                if (logger.IsTraceEnabled) {
-                    logger.Trace("Creating temporary AppDomain for resolving assemblies names.");
-                }
-                tempAppDomain = AppDomain.CreateDomain("tempAppDomain");
-                //
-                foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.GetAllIncludedObjects()) {
-                    if (configBase is IncludedAssemblyConfig) {
-                        string configuredAssemblyPath = configurePathByConfigurationVariables(configBase.Path, configuration);
-                        //
-                        if (logger.IsTraceEnabled) {
-                            logger.Trace(String.Format("Loading {0} assembly.", configuredAssemblyPath));
-                        }
-                        Assembly assembly = Assembly.ReflectionOnlyLoadFrom(configuredAssemblyPath);
-
-                        if ((configBase == configuration.OutputConfig.MainAssembly) && configuration.OutputConfig.GrabResources) {
-                            string[] manifestResourceNames = assembly.GetManifestResourceNames();
-                            foreach (string resourceName in manifestResourceNames) {
-                                // Change name of resources started with assembly name string
-                                string assemblyName = assembly.GetName().Name;
-                                string modifiedResourceName;
-                                if (resourceName.StartsWith(assemblyName)) {
-                                    modifiedResourceName = getOutputAssemblyName(configuration.OutputConfig) + resourceName.Substring(assemblyName.Length);
-                                } else {
-                                    modifiedResourceName = resourceName;
-                                }
-
-                                string resourceFilePath = Path.Combine(tempDirectoryName, modifiedResourceName);
-                                //
-                                if (File.Exists(resourceFilePath)) {
-                                    throw new InvalidOperationException(String.Format("File for resource with name {0} already exists. May be resources naming conflict ?", resourceName));
-                                }
-                                //
-                                using (FileStream fileStream = File.Create(resourceFilePath)) {
-                                    using (Stream stream = assembly.GetManifestResourceStream(resourceName)) {
-                                        if (stream == null) {
-                                            throw new InvalidOperationException("Cannot read one of manifest resource stream from assembly.");
-                                        }
-                                        const int bufferSize = 32 * 1024;
-                                        byte[] buffer = new byte[bufferSize];
-                                        int totalBytesReaded = 0;
-                                        while (stream.CanRead && (totalBytesReaded < stream.Length)) {
-                                            int readedBytes = stream.Read(buffer, 0, bufferSize);
-                                            fileStream.Write(buffer, 0, readedBytes);
-                                            totalBytesReaded += readedBytes;
-                                        }
-                                    }
-                                }
-                                //
-                                resourcesReflectedPaths.Add(resourceFilePath);
-                            }
-                        }
-
-                        string fullName = assembly.FullName;
-                        if (fullName == null) {
-                            throw new InvalidOperationException("Cannot resolve full name of assembly.");
-                        }
-                        IncludedAssemblyConfig assemblyConfig = ((IncludedAssemblyConfig)configBase);
-                        //
-                        if (addStringToTheListIfNotAlready(assemblyConfig.Aliases, fullName)) {
-                            if (logger.IsTraceEnabled) {
-                                logger.Trace(String.Format("Added full name to aliases : '{0}'.", fullName));
-                            }
-                        }
-                        //
-                        if (assemblyConfig.GeneratePartialAliases) {
-                            string[] fullNameParts = fullName.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                            //
-                            string partiallyName = fullNameParts[0];
-                            for (int i = 1; i < fullNameParts.Length; i++) {
-                                if (addStringToTheListIfNotAlready(assemblyConfig.Aliases, partiallyName)) {
-                                    if (logger.IsTraceEnabled) {
-                                        logger.Trace(String.Format("Added partially name to aliases : '{0}'.", partiallyName));
-                                    }
-                                }
-                                partiallyName = partiallyName + "," + fullNameParts[i];
-                            }
-                        }
-                    }
-                }
-                //
-            } catch (BadImageFormatException exc) {
-                if (logger.IsErrorEnabled) {
-                    logger.Error(String.Format("Error while assemblies names resolving. Message : {0}.", exc.Message), exc);
-                }
-                throw;
-            } finally {
-                if (tempAppDomain != null) {
+            foreach (IncludedObjectConfigBase configBase in configuration.OutputConfig.GetAllIncludedObjects()) {
+                if (configBase is IncludedAssemblyConfig) {
+                    string configuredAssemblyPath = configurePathByConfigurationVariables(configBase.Path, configuration);
+                    //
                     if (logger.IsTraceEnabled) {
-                        logger.Trace("Unloading temporary AppDomain.");
+                        logger.Trace(String.Format("Reading {0} assembly.", configuredAssemblyPath));
                     }
-                    AppDomain.Unload(tempAppDomain);
+                    ModuleDefinition moduleDefinition = ModuleDefinition.ReadModule(configuredAssemblyPath);
+
+                    if ((configBase == configuration.OutputConfig.MainAssembly) && configuration.OutputConfig.GrabResources) {
+                        Collection<Resource> resources = moduleDefinition.Resources;
+                        //
+                        foreach (Resource resource in resources) {
+                            if (resource.ResourceType != ResourceType.Embedded) {
+                                logger.Info(string.Format("Found resource {0}, resource type is not embedded, skip them.", resource.Name));
+                                continue;
+                            }
+                            EmbeddedResource embeddedResource = (EmbeddedResource) resource;
+                            // Change name of resources started with assembly name string
+                            string assemblyName = moduleDefinition.Assembly.Name.Name;
+                            string modifiedResourceName;
+                            if (resource.Name.StartsWith(assemblyName)) {
+                                modifiedResourceName = getOutputAssemblyName(configuration.OutputConfig) + resource.Name.Substring(assemblyName.Length);
+                            } else {
+                                modifiedResourceName = resource.Name;
+                            }
+                            //
+                            string resourceFilePath = Path.Combine(tempDirectoryName, modifiedResourceName);
+                            //
+                            if (File.Exists(resourceFilePath)) {
+                                throw new InvalidOperationException(String.Format("File for resource with name {0} already exists. May be resources naming conflict ?", resource.Name));
+                            }
+                            //
+                            using (FileStream fileStream = File.Create(resourceFilePath)) {
+                                using (Stream stream = embeddedResource.GetResourceStream()) {
+                                    if (stream == null) {
+                                        throw new InvalidOperationException("Cannot read one of manifest resource stream from assembly.");
+                                    }
+                                    const int bufferSize = 32 * 1024;
+                                    byte[] buffer = new byte[bufferSize];
+                                    int totalBytesReaded = 0;
+                                    while (stream.CanRead && (totalBytesReaded < stream.Length)) {
+                                        int readedBytes = stream.Read(buffer, 0, bufferSize);
+                                        fileStream.Write(buffer, 0, readedBytes);
+                                        totalBytesReaded += readedBytes;
+                                    }
+                                }
+                            }
+                            //
+                            resourcesReflectedPaths.Add(resourceFilePath);
+                        }
+                    }
+                    //
+                    string fullName = moduleDefinition.Assembly.FullName;
+                    if (fullName == null) {
+                        throw new InvalidOperationException("Cannot resolve full name of assembly.");
+                    }
+                    IncludedAssemblyConfig assemblyConfig = ((IncludedAssemblyConfig)configBase);
+                    //
+                    if (addStringToTheListIfNotAlready(assemblyConfig.Aliases, fullName)) {
+                        if (logger.IsTraceEnabled) {
+                            logger.Trace(String.Format("Added full name to aliases : '{0}'.", fullName));
+                        }
+                    }
+                    //
+                    if (assemblyConfig.GeneratePartialAliases) {
+                        string[] fullNameParts = fullName.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                        //
+                        string partiallyName = fullNameParts[0];
+                        for (int i = 1; i < fullNameParts.Length; i++) {
+                            if (addStringToTheListIfNotAlready(assemblyConfig.Aliases, partiallyName)) {
+                                if (logger.IsTraceEnabled) {
+                                    logger.Trace(String.Format("Added partially name to aliases : '{0}'.", partiallyName));
+                                }
+                            }
+                            partiallyName = partiallyName + "," + fullNameParts[i];
+                        }
+                    }
                 }
             }
         }
@@ -505,10 +490,10 @@ namespace NBox
             }
         }
 
-        static void _Main(string[] args) {
+        static int _Main(string[] args) {
             if (args.Length == 0) {
                 printUsage();
-                return;
+                return 1;
             }
 
             string tempDirectoryName = null;
@@ -586,7 +571,7 @@ namespace NBox
                 }
                 //
                 printFailureMessage();
-                return;
+                return -1;
             } finally {
                 try {
                     if (tempDirectoryName != null) {
@@ -598,6 +583,7 @@ namespace NBox
             }
 
             printSuccessMessage();
+            return 0;
         }
 
         private static void clearTemporaryDirectory(string tempDirectoryName) {
@@ -613,12 +599,8 @@ namespace NBox
 
         private struct EmbeddedResourceInfo
         {
-// ReSharper disable UnaccessedField.Local
-// ReSharper disable MemberCanBePrivate.Local
             public readonly byte[] Data;
             public readonly string ZipEntryName;
-// ReSharper restore MemberCanBePrivate.Local
-// ReSharper restore UnaccessedField.Local
 
             public EmbeddedResourceInfo(byte[] data, string zipEntryName) {
                 this.Data = data;
@@ -689,17 +671,18 @@ namespace NBox
             Console.WriteLine();
         }
 
-        static void Main(string[] args) {
+        static int Main(string[] args) {
             try {
                 AppDomain.CurrentDomain.UnhandledException += CurrentDomainOnUnhandledException;
                 //
-                _Main(args);
+                return _Main(args);
             } catch (Exception exc) {
                 if (logger.IsFatalEnabled) {
                     logger.Fatal("Unhandled exception intercepted in the Main method.");
                 }
                 //
                 handleUnhandledExceptionObject(exc);
+                return -1;
             }
         }
 
