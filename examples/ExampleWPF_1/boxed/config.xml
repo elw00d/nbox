@@ -30,6 +30,8 @@
         
       </files>
     </includes>
-    <compiler-options>/filealign:512 D:\all\Projects\NBox\trunk\NBox.Loader\Properties\AssemblyInfo.cs</compiler-options>
+    <compiler-options>
+		<options>/filealign:512 .\src\AssemblyInfo.cs</options>
+	</compiler-options>
   </output>
 </configuration>
