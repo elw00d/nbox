@@ -535,7 +535,7 @@ namespace NBox.Config
                 appConfigFileIdAttribute.Value = outputConfig.AppConfigFileID;
                 appConfigElement.Attributes.Append(appConfigFileIdAttribute);
 
-                if (false != outputConfig.UseShadowCopying )
+                if (outputConfig.UseShadowCopying )
                 {
                     XmlAttribute useShadowCopyAttribute = document.CreateAttribute("use-shadow-copying");
                     useShadowCopyAttribute.Value = outputConfig.UseShadowCopying.ToString().ToLower();

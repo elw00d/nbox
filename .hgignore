@@ -3,3 +3,12 @@ NBox.Loader/obj
 NBox/bin
 NBox/obj
 _ReSharper*
+syntax: glob
+NBox/NBox.csproj.user
+NBox.suo
+NBox.sln.DotSettings.user
+NBox.Loader/NBox.Loader.csproj.user
+NBox.5.0.ReSharper.user
+examples/NativeDll/NativeDll.suo
+examples/NativeDll/NativeDll/bin/
+examples/NativeDll/NativeDll/obj/
