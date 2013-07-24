@@ -88,11 +88,19 @@ ICSharpCode.SharpZipLib.dll     - сжимаем
         <assembly ref="ICSharpCode.SharpZipLib.dll"/>
       </assemblies>
       <files>
-        <file ref="NBox.exe.config"/>
+        <!-- При use-shadow-copying = true конфиг-файл будет скопирован во временную директорию, а не в директорию
+             с приложением. На запуск это не повлияет, AppDomain будет настроен корректно, конфиг-файл будет использован.
+        -->
+        <app-config use-shadow-copying="false" ref="NBox.exe.config"/>
+        <!-- Вместо app-config можно было воспользоваться просто файлом, но в этом случае приложение
+             не защищено от переименования, после переименования конфиг-файл перестанет подхватываться -->
+        <!--<file ref="NBox.exe.config"/>-->
       </files>
     </includes>
     <!-- Небольшая оптимизация для компилятора microsoft c# -->
-    <compiler-options>/filealign:512</compiler-options>
+    <compiler-options>
+         <options>/filealign:512</options>
+    </compiler-options>
   </output>
 </configuration>
 
